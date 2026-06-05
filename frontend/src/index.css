@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { font-family: Inter, "Segoe UI", sans-serif; color: #E2E8F0; background: #0A192F; }
+* { scrollbar-width: thin; scrollbar-color: #334669 #0A192F; }
+*::-webkit-scrollbar { height: 8px; width: 8px; }
+*::-webkit-scrollbar-track { background: #0A192F; }
+*::-webkit-scrollbar-thumb { background: #334669; border-radius: 99px; }
+body { margin: 0; min-width: 320px; min-height: 100vh; background: radial-gradient(circle at 85% 5%, rgba(59,130,246,.14), transparent 28%), #0A192F; }
+.gradient-text { background: linear-gradient(120deg, #2DD4BF, #3B82F6); -webkit-background-clip: text; color: transparent; }
+.gradient-fill { background: linear-gradient(120deg, #2DD4BF, #3B82F6); }
+.fc { --fc-border-color: #263857; --fc-page-bg-color: #1E2A47; --fc-neutral-bg-color: #112240; --fc-today-bg-color: rgba(45,212,191,.09); }
+.fc .fc-button-primary { background: #112240; border-color: #334669; }
+.fc .fc-button-primary:not(:disabled).fc-button-active { background: #3B82F6; }

@@ -1,0 +1,985 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  USER
+}
+
+enum ClientType {
+  INDIVIDUAL
+  COMPANY
+}
+
+enum ClientStatus {
+  ACTIVE
+  INACTIVE
+  PROSPECT
+}
+
+enum ContactType {
+  PHONE
+  WHATSAPP
+  EMAIL
+}
+
+enum ScheduleStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  PAUSED
+  COMPLETED
+}
+
+enum ReminderChannel {
+  APP
+  EMAIL
+  WHATSAPP
+}
+
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum CrmLeadScore {
+  VERY_HOT
+  HOT
+  WARM
+  COLD
+}
+
+enum CrmLeadStatus {
+  NEW
+  IN_SERVICE
+  QUALIFIED
+  PROPOSAL_SENT
+  NEGOTIATION
+  WON
+  LOST
+}
+
+enum CrmPipelineStage {
+  LEAD_RECEIVED
+  FIRST_CONTACT
+  QUALIFICATION
+  DEMONSTRATION
+  PROPOSAL_SENT
+  NEGOTIATION
+  APPROVAL
+  IMPLEMENTATION
+  SALE_COMPLETED
+  LOST
+}
+
+enum CrmActivityType {
+  CALL
+  EMAIL
+  WHATSAPP
+  MEETING
+  STATUS_CHANGE
+  PROPOSAL
+  CONTRACT
+  TASK
+  NOTE
+  VISIT
+  DEMONSTRATION
+  FOLLOW_UP
+  IMPLEMENTATION
+  TRAINING
+}
+
+enum CrmActivityStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+enum CrmProposalStatus {
+  DRAFT
+  SENT
+  APPROVED
+  REJECTED
+}
+
+enum CrmContractStatus {
+  DRAFT
+  ACTIVE
+  FINISHED
+  CANCELLED
+}
+
+enum CrmProjectStatus {
+  NOT_STARTED
+  PLANNING
+  IN_DEVELOPMENT
+  IN_TESTS
+  IN_APPROVAL
+  IN_DEPLOYMENT
+  IN_TRAINING
+  COMPLETED
+  CANCELLED
+}
+
+enum CrmTaskStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum CrmAutomationTrigger {
+  LEAD_CREATED
+  PROPOSAL_SENT
+  SALE_COMPLETED
+  PROJECT_COMPLETED
+  LEAD_IDLE
+}
+
+enum CrmAutomationAction {
+  CREATE_TASK
+  CREATE_FOLLOW_UP
+  CREATE_PROJECT
+  REQUEST_SURVEY
+  CREATE_ALERT
+}
+
+enum CommunicationChannel {
+  EMAIL
+  WHATSAPP
+}
+
+enum CommunicationProvider {
+  SMTP
+  SENDGRID
+  RESEND
+  META_WHATSAPP
+  ZAPI
+  EVOLUTION
+  WEBHOOK
+}
+
+enum CommunicationStatus {
+  DRAFT
+  QUEUED
+  SENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+  CANCELLED
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  RUNNING
+  FINISHED
+  CANCELLED
+}
+
+enum CustomerRiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model User {
+  id                       String                        @id @default(cuid())
+  name                     String
+  email                    String                        @unique
+  passwordHash             String
+  role                     UserRole                      @default(USER)
+  avatarUrl                String?
+  theme                    String                        @default("dark")
+  notifications            Boolean                       @default(true)
+  createdAt                DateTime                      @default(now())
+  updatedAt                DateTime                      @updatedAt
+  clients                  Client[]
+  schedules                Schedule[]
+  tasks                    Task[]
+  notes                    Note[]
+  auditLogs                AuditLog[]
+  refreshTokens            RefreshToken[]
+  attachments              Attachment[]
+  projects                 Project[]
+  googleCalendarConnection GoogleCalendarConnection?
+  crmLeads                 CrmLead[]
+  crmClients               CrmClient[]
+  crmActivities            CrmActivity[]
+  crmProposals             CrmProposal[]
+  crmContracts             CrmContract[]
+  crmProjects              CrmProject[]
+  crmAutomations           CrmAutomation[]
+  communicationTemplates   CommunicationTemplate[]
+  communicationMessages    CommunicationMessage[]
+  communicationConfigs     CommunicationProviderConfig[]
+  communicationCampaigns   CommunicationCampaign[]
+  crmGoals                 CrmGoal[]
+  crmSlaRules              CrmSlaRule[]
+
+  @@map("usuarios")
+}
+
+model Client {
+  id            String          @id @default(cuid())
+  ownerId       String
+  owner         User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name          String
+  document      String?         @unique
+  type          ClientType      @default(INDIVIDUAL)
+  birthDate     DateTime?
+  gender        String?
+  email         String?
+  phone         String?
+  whatsapp      String?
+  postalCode    String?
+  street        String?
+  number        String?
+  district      String?
+  city          String?
+  state         String?
+  observations  String?
+  status        ClientStatus    @default(PROSPECT)
+  expectedValue Decimal?        @db.Decimal(12, 2)
+  categoryId    String?
+  category      Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  contacts      ClientContact[]
+  schedules     Schedule[]
+  tasks         Task[]
+  notes         Note[]
+  attachments   Attachment[]
+  tags          ClientTag[]
+  auditLogs     AuditLog[]
+  projects      Project[]
+  projectLinks  ClientProject[]
+
+  @@index([ownerId, status])
+  @@index([ownerId, name])
+  @@map("clientes")
+}
+
+model ClientContact {
+  id        String      @id @default(cuid())
+  clientId  String
+  client    Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  type      ContactType
+  value     String
+  label     String?
+  primary   Boolean     @default(false)
+  createdAt DateTime    @default(now())
+
+  @@index([clientId])
+  @@map("contatos_clientes")
+}
+
+model Category {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  color     String
+  createdAt DateTime   @default(now())
+  clients   Client[]
+  schedules Schedule[]
+  tasks     Task[]
+
+  @@map("categorias")
+}
+
+model Tag {
+  id      String      @id @default(cuid())
+  name    String      @unique
+  color   String
+  clients ClientTag[]
+
+  @@map("etiquetas")
+}
+
+model ClientTag {
+  clientId String
+  tagId    String
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  tag      Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([clientId, tagId])
+  @@map("clientes_etiquetas")
+}
+
+model Schedule {
+  id               String         @id @default(cuid())
+  userId           String
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clientId         String?
+  client           Client?        @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  categoryId       String?
+  category         Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  title            String
+  description      String?
+  location         String?
+  startAt          DateTime
+  endAt            DateTime
+  allDay           Boolean        @default(false)
+  status           ScheduleStatus @default(SCHEDULED)
+  color            String?
+  recurrenceRule   String?
+  googleEventId    String?
+  googleCalendarId String?
+  googleSyncedAt   DateTime?
+  googleSyncStatus String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  reminders        Reminder[]
+
+  @@index([userId, startAt])
+  @@index([userId, googleEventId])
+  @@index([clientId])
+  @@map("compromissos")
+}
+
+model GoogleCalendarConnection {
+  id                         String   @id @default(cuid())
+  userId                     String   @unique
+  user                       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  googleEmail                String?
+  calendarId                 String   @default("primary")
+  oauthClientId              String?
+  oauthClientSecretEncrypted String?
+  redirectUri                String?
+  accessTokenEncrypted       String
+  refreshTokenEncrypted      String?
+  scope                      String
+  expiresAt                  DateTime
+  syncEnabled                Boolean  @default(true)
+  connectedAt                DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+
+  @@map("conexoes_google_agenda")
+}
+
+model GoogleCalendarOAuthDraft {
+  id                         String   @id @default(cuid())
+  userId                     String   @unique
+  calendarId                 String   @default("primary")
+  oauthClientId              String
+  oauthClientSecretEncrypted String
+  redirectUri                String
+  expiresAt                  DateTime
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+
+  @@map("rascunhos_oauth_google_agenda")
+}
+
+model TaskColumn {
+  id       String     @id @default(cuid())
+  title    String
+  status   TaskStatus @unique
+  position Int
+  tasks    Task[]
+
+  @@map("colunas_tarefas")
+}
+
+model Task {
+  id          String     @id @default(cuid())
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clientId    String?
+  client      Client?    @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  categoryId  String?
+  category    Category?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  projectId   String?
+  project     Project?   @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  columnId    String
+  column      TaskColumn @relation(fields: [columnId], references: [id])
+  title       String
+  description String?
+  priority    Priority   @default(MEDIUM)
+  status      TaskStatus @default(NOT_STARTED)
+  dueDate     DateTime?
+  position    Int        @default(0)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([userId, status])
+  @@index([dueDate])
+  @@map("tarefas")
+}
+
+model Project {
+  id          String          @id @default(cuid())
+  ownerId     String
+  owner       User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  clientId    String?
+  client      Client?         @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  name        String
+  code        String          @unique
+  description String?
+  status      ProjectStatus   @default(PLANNING)
+  priority    Priority        @default(MEDIUM)
+  startDate   DateTime?
+  dueDate     DateTime?
+  budget      Decimal?        @db.Decimal(12, 2)
+  progress    Int             @default(0)
+  color       String          @default("#3B82F6")
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  tasks       Task[]
+  clientLinks ClientProject[]
+
+  @@index([ownerId, status])
+  @@index([clientId])
+  @@map("projetos")
+}
+
+model ClientProject {
+  clientId  String
+  projectId String
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([clientId, projectId])
+  @@map("clientes_projetos")
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clientId  String?
+  client    Client?  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  title     String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clientId, createdAt])
+  @@map("observacoes")
+}
+
+model Reminder {
+  id         String          @id @default(cuid())
+  scheduleId String
+  schedule   Schedule        @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  remindAt   DateTime
+  channel    ReminderChannel @default(APP)
+  sentAt     DateTime?
+
+  @@index([remindAt])
+  @@map("lembretes")
+}
+
+model Attachment {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clientId  String?
+  client    Client?  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name      String
+  url       String
+  mimeType  String
+  size      Int
+  createdAt DateTime @default(now())
+
+  @@index([clientId])
+  @@map("anexos")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clientId  String?
+  client    Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  entity    String
+  entityId  String
+  action    String
+  changes   Json?
+  createdAt DateTime @default(now())
+
+  @@index([clientId, createdAt])
+  @@index([entity, entityId])
+  @@map("registros_auditoria")
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@map("tokens_renovacao")
+}
+
+model CrmLead {
+  id                String                 @id @default(cuid())
+  tenantId          String                 @default("default")
+  ownerId           String
+  owner             User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  clientId          String?
+  client            CrmClient?             @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  name              String
+  company           String?
+  document          String?
+  segment           String?
+  position          String?
+  email             String?
+  phone             String?
+  whatsapp          String?
+  site              String?
+  postalCode        String?
+  street            String?
+  number            String?
+  district          String?
+  city              String?
+  state             String?
+  source            String?
+  campaign          String?
+  responsible       String
+  interest          String?
+  productInterest   String?
+  estimatedValue    Decimal?               @db.Decimal(12, 2)
+  observations      String?
+  score             CrmLeadScore           @default(WARM)
+  priority          Priority               @default(MEDIUM)
+  status            CrmLeadStatus          @default(NEW)
+  stage             CrmPipelineStage       @default(LEAD_RECEIVED)
+  lostReason        String?
+  lastInteractionAt DateTime?
+  nextFollowUpAt    DateTime?
+  wonAt             DateTime?
+  lostAt            DateTime?
+  convertedAt       DateTime?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  deletedAt         DateTime?
+  activities        CrmActivity[]
+  proposals         CrmProposal[]
+  messages          CommunicationMessage[]
+
+  @@index([tenantId, ownerId, status])
+  @@index([tenantId, ownerId, stage])
+  @@index([tenantId, ownerId, createdAt])
+  @@map("crm_leads")
+}
+
+model CrmClient {
+  id           String                 @id @default(cuid())
+  tenantId     String                 @default("default")
+  ownerId      String
+  owner        User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name         String
+  company      String?
+  document     String?
+  segment      String?
+  email        String?
+  phone        String?
+  whatsapp     String?
+  postalCode   String?
+  street       String?
+  number       String?
+  district     String?
+  city         String?
+  state        String?
+  observations String?
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+  deletedAt    DateTime?
+  leads        CrmLead[]
+  activities   CrmActivity[]
+  proposals    CrmProposal[]
+  contracts    CrmContract[]
+  projects     CrmProject[]
+  messages     CommunicationMessage[]
+  scores       CrmCustomerScore[]
+
+  @@index([tenantId, ownerId, name])
+  @@map("crm_clientes")
+}
+
+model CrmActivity {
+  id          String            @id @default(cuid())
+  tenantId    String            @default("default")
+  ownerId     String
+  owner       User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  leadId      String?
+  lead        CrmLead?          @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  clientId    String?
+  client      CrmClient?        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  projectId   String?
+  project     CrmProject?       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  type        CrmActivityType
+  status      CrmActivityStatus @default(PENDING)
+  title       String
+  description String?
+  responsible String
+  scheduledAt DateTime?
+  completedAt DateTime?
+  metadata    Json?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  deletedAt   DateTime?
+
+  @@index([tenantId, ownerId, scheduledAt])
+  @@index([leadId, createdAt])
+  @@index([clientId, createdAt])
+  @@map("crm_atividades")
+}
+
+model CrmProposal {
+  id             String            @id @default(cuid())
+  tenantId       String            @default("default")
+  ownerId        String
+  owner          User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  leadId         String?
+  lead           CrmLead?          @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  clientId       String?
+  client         CrmClient?        @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  number         String
+  product        String
+  value          Decimal           @db.Decimal(12, 2)
+  discount       Decimal           @default(0) @db.Decimal(12, 2)
+  paymentTerms   String?
+  deadline       String?
+  observations   String?
+  status         CrmProposalStatus @default(DRAFT)
+  version        Int               @default(1)
+  versionHistory Json              @default("[]")
+  approvedAt     DateTime?
+  rejectedAt     DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  deletedAt      DateTime?
+
+  @@unique([tenantId, number])
+  @@index([tenantId, ownerId, status])
+  @@map("crm_propostas")
+}
+
+model CrmContract {
+  id           String            @id @default(cuid())
+  tenantId     String            @default("default")
+  ownerId      String
+  owner        User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  clientId     String
+  client       CrmClient         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  proposalId   String?
+  number       String
+  serviceOrder String
+  value        Decimal           @db.Decimal(12, 2)
+  status       CrmContractStatus @default(DRAFT)
+  startDate    DateTime?
+  endDate      DateTime?
+  observations String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  deletedAt    DateTime?
+
+  @@unique([tenantId, number])
+  @@index([tenantId, ownerId, status])
+  @@map("crm_contratos")
+}
+
+model CrmProject {
+  id            String           @id @default(cuid())
+  tenantId      String           @default("default")
+  ownerId       String
+  owner         User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  clientId      String
+  client        CrmClient        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name          String
+  responsible   String
+  team          Json             @default("[]")
+  priority      Priority         @default(MEDIUM)
+  status        CrmProjectStatus @default(NOT_STARTED)
+  startDate     DateTime?
+  endDate       DateTime?
+  budget        Decimal?         @db.Decimal(12, 2)
+  plannedHours  Decimal?         @db.Decimal(10, 2)
+  executedHours Decimal?         @default(0) @db.Decimal(10, 2)
+  progress      Int              @default(0)
+  observations  String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  deletedAt     DateTime?
+  tasks         CrmProjectTask[]
+  activities    CrmActivity[]
+
+  @@index([tenantId, ownerId, status])
+  @@index([clientId])
+  @@map("crm_projetos")
+}
+
+model CrmProjectTask {
+  id           String           @id @default(cuid())
+  tenantId     String           @default("default")
+  projectId    String
+  project      CrmProject       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parentTaskId String?
+  parentTask   CrmProjectTask?  @relation("CrmSubtasks", fields: [parentTaskId], references: [id], onDelete: Cascade)
+  subtasks     CrmProjectTask[] @relation("CrmSubtasks")
+  title        String
+  description  String?
+  responsible  String
+  priority     Priority         @default(MEDIUM)
+  status       CrmTaskStatus    @default(NOT_STARTED)
+  startDate    DateTime?
+  endDate      DateTime?
+  plannedHours Decimal?         @db.Decimal(10, 2)
+  checklist    Json             @default("[]")
+  attachments  Json             @default("[]")
+  comments     Json             @default("[]")
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  deletedAt    DateTime?
+
+  @@index([tenantId, projectId, status])
+  @@map("crm_tarefas_projetos")
+}
+
+model CrmAutomation {
+  id         String               @id @default(cuid())
+  tenantId   String               @default("default")
+  ownerId    String
+  owner      User                 @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name       String
+  trigger    CrmAutomationTrigger
+  action     CrmAutomationAction
+  active     Boolean              @default(true)
+  parameters Json                 @default("{}")
+  createdAt  DateTime             @default(now())
+  updatedAt  DateTime             @updatedAt
+  deletedAt  DateTime?
+
+  @@index([tenantId, ownerId, active])
+  @@map("crm_automacoes")
+}
+
+model CommunicationProviderConfig {
+  id                 String                @id @default(cuid())
+  tenantId           String                @default("default")
+  ownerId            String
+  owner              User                  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  channel            CommunicationChannel
+  provider           CommunicationProvider
+  name               String
+  senderName         String?
+  senderAddress      String?
+  endpointUrl        String?
+  apiKeyEncrypted    String?
+  apiSecretEncrypted String?
+  defaultFrom        String?
+  active             Boolean               @default(true)
+  metadata           Json                  @default("{}")
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  deletedAt          DateTime?
+
+  @@index([tenantId, ownerId, channel, active])
+  @@map("crm_configuracoes_comunicacao")
+}
+
+model CommunicationTemplate {
+  id        String                  @id @default(cuid())
+  tenantId  String                  @default("default")
+  ownerId   String
+  owner     User                    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  channel   CommunicationChannel
+  name      String
+  subject   String?
+  body      String
+  variables Json                    @default("[]")
+  active    Boolean                 @default(true)
+  createdAt DateTime                @default(now())
+  updatedAt DateTime                @updatedAt
+  deletedAt DateTime?
+  messages  CommunicationMessage[]
+  campaigns CommunicationCampaign[]
+
+  @@index([tenantId, ownerId, channel, active])
+  @@map("crm_templates_comunicacao")
+}
+
+model CommunicationMessage {
+  id                String                      @id @default(cuid())
+  tenantId          String                      @default("default")
+  ownerId           String
+  owner             User                        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  channel           CommunicationChannel
+  provider          CommunicationProvider?
+  status            CommunicationStatus         @default(QUEUED)
+  templateId        String?
+  template          CommunicationTemplate?      @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  leadId            String?
+  lead              CrmLead?                    @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  clientId          String?
+  client            CrmClient?                  @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  campaignId        String?
+  campaign          CommunicationCampaign?      @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  recipientName     String?
+  recipient         String
+  subject           String?
+  body              String
+  providerMessageId String?
+  errorMessage      String?
+  scheduledAt       DateTime?
+  sentAt            DateTime?
+  deliveredAt       DateTime?
+  readAt            DateTime?
+  attempts          Int                         @default(0)
+  metadata          Json                        @default("{}")
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
+  deletedAt         DateTime?
+  queueItems        CommunicationQueueItem[]
+  webhookEvents     CommunicationWebhookEvent[]
+
+  @@index([tenantId, ownerId, status, scheduledAt])
+  @@index([clientId, createdAt])
+  @@index([leadId, createdAt])
+  @@map("crm_mensagens_comunicacao")
+}
+
+model CommunicationQueueItem {
+  id           String               @id @default(cuid())
+  tenantId     String               @default("default")
+  messageId    String
+  message      CommunicationMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  status       CommunicationStatus  @default(QUEUED)
+  scheduledAt  DateTime             @default(now())
+  processedAt  DateTime?
+  errorMessage String?
+  attempts     Int                  @default(0)
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  @@index([tenantId, status, scheduledAt])
+  @@map("crm_fila_comunicacao")
+}
+
+model CommunicationCampaign {
+  id          String                 @id @default(cuid())
+  tenantId    String                 @default("default")
+  ownerId     String
+  owner       User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name        String
+  channel     CommunicationChannel
+  status      CampaignStatus         @default(DRAFT)
+  templateId  String?
+  template    CommunicationTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  filters     Json                   @default("{}")
+  scheduledAt DateTime?
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+  deletedAt   DateTime?
+  messages    CommunicationMessage[]
+
+  @@index([tenantId, ownerId, status])
+  @@map("crm_campanhas_comunicacao")
+}
+
+model CrmCustomerScore {
+  id              String            @id @default(cuid())
+  tenantId        String            @default("default")
+  clientId        String
+  client          CrmClient         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  score           Int
+  riskLevel       CustomerRiskLevel @default(LOW)
+  potentialValue  Decimal?          @db.Decimal(12, 2)
+  engagementScore Int               @default(0)
+  recurrenceScore Int               @default(0)
+  overdueScore    Int               @default(0)
+  reason          String?
+  calculatedAt    DateTime          @default(now())
+
+  @@index([tenantId, clientId, calculatedAt])
+  @@map("crm_scores_clientes")
+}
+
+model CrmGoal {
+  id            String    @id @default(cuid())
+  tenantId      String    @default("default")
+  ownerId       String
+  owner         User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name          String
+  responsible   String?
+  periodStart   DateTime
+  periodEnd     DateTime
+  targetValue   Decimal?  @db.Decimal(12, 2)
+  targetCount   Int?
+  achievedValue Decimal?  @default(0) @db.Decimal(12, 2)
+  achievedCount Int       @default(0)
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  @@index([tenantId, ownerId, active])
+  @@map("crm_metas")
+}
+
+model CrmSlaRule {
+  id        String            @id @default(cuid())
+  tenantId  String            @default("default")
+  ownerId   String
+  owner     User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name      String
+  stage     CrmPipelineStage?
+  priority  Priority?
+  maxHours  Int
+  active    Boolean           @default(true)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  deletedAt DateTime?
+
+  @@index([tenantId, ownerId, active])
+  @@map("crm_regras_sla")
+}
+
+model CommunicationWebhookEvent {
+  id                String                 @id @default(cuid())
+  tenantId          String                 @default("default")
+  channel           CommunicationChannel
+  provider          CommunicationProvider?
+  messageId         String?
+  message           CommunicationMessage?  @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  providerMessageId String?
+  status            CommunicationStatus?
+  payload           Json
+  receivedAt        DateTime               @default(now())
+
+  @@index([tenantId, providerMessageId])
+  @@map("crm_webhooks_comunicacao")
+}
