@@ -30,10 +30,51 @@ docker compose --env-file .env.production -f docker-compose.prod.yml exec backen
 Teste no servidor:
 
 ```bash
-curl http://localhost/health
+curl http://127.0.0.1:8081/health
 ```
 
-## 2. Cloudflare DNS
+## 2. Mesmo servidor do g3n.htasistemas.com.br
+
+Como a intranet vai rodar no mesmo servidor do `g3n.htasistemas.com.br`, o container publica a aplicacao somente em:
+
+```text
+http://127.0.0.1:8081
+```
+
+Assim, ele nao disputa as portas publicas `80` e `443` com o site atual. O Nginx, Apache, Caddy ou outro proxy principal do servidor deve receber `intranet.htasistemas.com.br` e encaminhar para `127.0.0.1:8081`.
+
+Exemplo com Nginx no host:
+
+```nginx
+server {
+  listen 80;
+  server_name intranet.htasistemas.com.br;
+
+  location / {
+    proxy_pass http://127.0.0.1:8081;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+}
+```
+
+Recarregue o Nginx:
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+Se usar Certbot:
+
+```bash
+sudo certbot --nginx -d intranet.htasistemas.com.br
+```
+
+## 3. Cloudflare DNS
 
 No Cloudflare, em `htasistemas.com.br`:
 
@@ -41,13 +82,19 @@ No Cloudflare, em `htasistemas.com.br`:
 | --- | --- | --- | --- |
 | A | `intranet` | IP publico da VPS | Proxied |
 
+Como esta no mesmo servidor do `g3n.htasistemas.com.br`, tambem pode usar CNAME:
+
+| Tipo | Nome | Target | Proxy |
+| --- | --- | --- | --- |
+| CNAME | `intranet` | `g3n.htasistemas.com.br` | Proxied |
+
 Se o provedor der um hostname em vez de IP, use `CNAME`:
 
 | Tipo | Nome | Target | Proxy |
 | --- | --- | --- | --- |
 | CNAME | `intranet` | hostname do provedor | Proxied |
 
-## 3. SSL/TLS
+## 4. SSL/TLS
 
 Recomendado para producao:
 
@@ -56,7 +103,7 @@ Recomendado para producao:
 
 Para teste inicial sem TLS no servidor, `Flexible` pode funcionar, mas nao e recomendado para producao.
 
-## 4. Validacao
+## 5. Validacao
 
 Acesse:
 
@@ -65,7 +112,7 @@ https://intranet.htasistemas.com.br
 https://intranet.htasistemas.com.br/health
 ```
 
-## 5. Atualizacao
+## 6. Atualizacao
 
 ```bash
 git pull
