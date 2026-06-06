@@ -37,6 +37,9 @@ jobs:
       - name: Instalar dependencias
         run: npm ci
 
+      - name: Corrigir dependencia nativa do Rollup no Linux
+        run: npm install --no-save @rollup/rollup-linux-x64-gnu@$(node -p "require('./node_modules/rollup/package.json').version")
+
       - name: Gerar Prisma Client
         run: npm run prisma:generate -w backend
 
