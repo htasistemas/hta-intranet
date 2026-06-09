@@ -109,7 +109,7 @@ export default function CalendarPage() {
     const schedule = data.find((item) => item.id === event.id);
     if (!schedule || !event.start || !event.end) return;
     try {
-      await api.put(`/schedules/${schedule.id}`, { title: schedule.title, description: schedule.description, location: null, clientId: schedule.client?.id ?? null, categoryId: null, startAt: event.start.toISOString(), endAt: event.end.toISOString(), allDay: event.allDay, status: "SCHEDULED", color: schedule.color, recurrenceRule: null, reminderAt: null });
+      await api.put(`/schedules/${schedule.id}`, { title: schedule.title, type: schedule.type ?? "FOLLOW_UP", description: schedule.description, location: null, clientId: schedule.client?.id ?? null, projectId: schedule.project?.id ?? null, categoryId: null, startAt: event.start.toISOString(), endAt: event.end.toISOString(), allDay: event.allDay, status: schedule.status ?? "SCHEDULED", color: schedule.color, recurrenceRule: null, reminderAt: null });
       void client.invalidateQueries({ queryKey: ["schedules"] });
       toast("Horario atualizado.");
     } catch (error) { revert(); toast(error instanceof Error ? error.message : "Falha ao mover.", "error"); }
@@ -135,7 +135,7 @@ export default function CalendarPage() {
         </div>
       </div>
       <Card className="p-4 md:p-6">
-        <FullCalendar plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]} locale={ptBrLocale} initialView="dayGridMonth" selectable editable nowIndicator height="auto" headerToolbar={{ left: "prev,next today", center: "title", right: "dayGridMonth,timeGridWeek,timeGridDay,listWeek" }} events={data.map((item) => ({ id: item.id, title: item.googleEventId ? `${item.title} · Google` : item.title, start: item.startAt, end: item.endAt, color: item.googleSyncStatus === "ERROR" ? "#EF4444" : item.color ?? "#3B82F6", allDay: item.allDay }))} select={select} eventChange={(argument) => void change(argument)} eventClick={({ event }) => { setSelectedSchedule(data.find((item) => item.id === event.id)); setOpened(true); }} />
+        <FullCalendar plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]} locale={ptBrLocale} initialView="dayGridMonth" selectable editable nowIndicator height="auto" headerToolbar={{ left: "prev,next today", center: "title", right: "dayGridMonth,timeGridWeek,timeGridDay,listWeek" }} events={data.map((item) => ({ id: item.id, title: item.googleEventId ? `${item.title} - Google` : `${item.title}${item.type ? ` - ${item.type}` : ""}`, start: item.startAt, end: item.endAt, color: item.googleSyncStatus === "ERROR" ? "#EF4444" : item.color ?? "#3B82F6", allDay: item.allDay }))} select={select} eventChange={(argument) => void change(argument)} eventClick={({ event }) => { setSelectedSchedule(data.find((item) => item.id === event.id)); setOpened(true); }} />
       </Card>
       <Dialog open={opened} title={selectedSchedule ? "Editar compromisso" : "Novo compromisso"} onClose={() => setOpened(false)}>
         <ScheduleForm schedule={selectedSchedule} selectedDate={selectedDate} onSave={(input) => save.mutateAsync(input).then(() => undefined)} onCancel={() => setOpened(false)} />

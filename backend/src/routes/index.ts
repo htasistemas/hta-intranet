@@ -7,6 +7,7 @@ import { ReportController } from "../controllers/report.controller.js";
 import { CrmController } from "../controllers/crm.controller.js";
 import { GoogleCalendarController } from "../controllers/google-calendar.controller.js";
 import { CommunicationController } from "../controllers/communication.controller.js";
+import { ProductController } from "../controllers/product.controller.js";
 import { asyncHandler } from "../utils/async-handler.js";
 import { validateBody } from "../middleware/validate.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -30,6 +31,8 @@ import {
   crmGoalSchema,
   crmSlaRuleSchema,
   noteSchema,
+  clientProductSchema,
+  productServiceSchema,
   projectSchema,
   scheduleSchema,
   taskSchema,
@@ -49,6 +52,7 @@ const reports = new ReportController();
 const crm = new CrmController();
 const googleCalendar = new GoogleCalendarController();
 const communication = new CommunicationController();
+const products = new ProductController();
 export const apiRouter = Router();
 
 const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false });
@@ -78,6 +82,16 @@ apiRouter.get("/clients/:id", asyncHandler(clients.get));
 apiRouter.post("/clients", validateBody(clientSchema), asyncHandler(clients.create));
 apiRouter.put("/clients/:id", validateBody(clientSchema), asyncHandler(clients.update));
 apiRouter.delete("/clients/:id", asyncHandler(clients.delete));
+apiRouter.get("/products", asyncHandler(products.list));
+apiRouter.get("/products/insights", asyncHandler(products.insights));
+apiRouter.get("/products/:id", asyncHandler(products.get));
+apiRouter.post("/products", validateBody(productServiceSchema), asyncHandler(products.create));
+apiRouter.put("/products/:id", validateBody(productServiceSchema), asyncHandler(products.update));
+apiRouter.delete("/products/:id", asyncHandler(products.delete));
+apiRouter.get("/client-products", asyncHandler(products.listClientProducts));
+apiRouter.post("/client-products", validateBody(clientProductSchema), asyncHandler(products.createClientProduct));
+apiRouter.put("/client-products/:id", validateBody(clientProductSchema), asyncHandler(products.updateClientProduct));
+apiRouter.delete("/client-products/:id", asyncHandler(products.deleteClientProduct));
 apiRouter.get("/projects", asyncHandler(projects.list));
 apiRouter.get("/projects/:id", asyncHandler(projects.get));
 apiRouter.post("/projects", validateBody(projectSchema), asyncHandler(projects.create));

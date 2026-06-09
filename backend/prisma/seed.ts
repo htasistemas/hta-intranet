@@ -49,6 +49,8 @@ async function seed(): Promise<void> {
   await prisma.schedule.deleteMany({ where: { userId: admin.id } });
   await prisma.note.deleteMany({ where: { userId: admin.id } });
   await prisma.project.deleteMany({ where: { ownerId: admin.id } });
+  await prisma.clientProduct.deleteMany({ where: { ownerId: admin.id } });
+  await prisma.productService.deleteMany({ where: { ownerId: admin.id } });
   await prisma.client.deleteMany({ where: { ownerId: admin.id } });
 
   const clientInput = [
@@ -77,11 +79,63 @@ async function seed(): Promise<void> {
   if (!atlas || !mariana || !horizonte) throw new Error("Clientes iniciais nao foram criados.");
 
   const today = startOfDay(new Date());
+  const [portalProduto, consultoriaProduto, suporteProduto] = await Promise.all([
+    prisma.productService.create({
+      data: {
+        ownerId: admin.id,
+        code: "SRV-PORTAL",
+        name: "Portal de Relacionamento",
+        type: "PROJECT",
+        category: "Implantacao",
+        commercialDescription: "Portal corporativo para relacionamento com clientes e indicadores executivos.",
+        unit: "projeto",
+        price: 48000,
+        cost: 22000,
+        margin: 54.16,
+        sla: "Atendimento em ate 8 horas uteis",
+        deliveryTime: "60 dias",
+        technicalOwner: "Equipe HTA"
+      }
+    }),
+    prisma.productService.create({
+      data: {
+        ownerId: admin.id,
+        code: "SRV-CONSULT",
+        name: "Consultoria Mensal",
+        type: "SUBSCRIPTION",
+        category: "Consultoria",
+        unit: "mensal",
+        price: 5200,
+        cost: 1800,
+        margin: 65.38,
+        sla: "Retorno em ate 1 dia util",
+        deliveryTime: "Recorrente",
+        technicalOwner: "Consultoria"
+      }
+    }),
+    prisma.productService.create({
+      data: {
+        ownerId: admin.id,
+        code: "SRV-SUPORTE",
+        name: "Suporte Premium",
+        type: "SUBSCRIPTION",
+        category: "Suporte",
+        unit: "mensal",
+        price: 2400,
+        cost: 900,
+        margin: 62.5,
+        sla: "Atendimento em ate 4 horas uteis",
+        deliveryTime: "Recorrente",
+        technicalOwner: "Suporte"
+      }
+    })
+  ]);
   const [portalAtlas, consultoriaMariana] = await Promise.all([
     prisma.project.create({
       data: {
         ownerId: admin.id,
         clientId: atlas.id,
+        productId: portalProduto.id,
         name: "Portal de Relacionamento Atlas",
         code: "PRJ-ATLAS-01",
         description: "Implantacao do portal de relacionamento e indicadores executivos.",
@@ -98,6 +152,7 @@ async function seed(): Promise<void> {
       data: {
         ownerId: admin.id,
         clientId: mariana.id,
+        productId: consultoriaProduto.id,
         name: "Plano de Consultoria Mariana",
         code: "PRJ-MAR-01",
         description: "Planejamento e entregas consultivas do trimestre.",
@@ -112,11 +167,18 @@ async function seed(): Promise<void> {
     })
   ]);
 
+  await prisma.clientProduct.createMany({
+    data: [
+      { ownerId: admin.id, clientId: atlas.id, productId: suporteProduto.id, startDate: addDays(today, -90), renewalDate: addDays(today, 18), contractedValue: 2400, status: "ACTIVE", responsible: "Comercial" },
+      { ownerId: admin.id, clientId: mariana.id, productId: consultoriaProduto.id, startDate: addDays(today, -30), renewalDate: addDays(today, 27), contractedValue: 5200, status: "ACTIVE", responsible: "Consultoria" }
+    ]
+  });
+
   await prisma.schedule.createMany({
     data: [
-      { userId: admin.id, clientId: atlas.id, categoryId: premium.id, title: "Reuniao estrategica - Atlas", startAt: addHours(today, 10), endAt: addHours(today, 11), color: "#3B82F6" },
-      { userId: admin.id, clientId: mariana.id, categoryId: consultoria.id, title: "Follow-up Mariana", startAt: addHours(today, 14), endAt: addHours(today, 15), color: "#2DD4BF" },
-      { userId: admin.id, clientId: horizonte.id, categoryId: renovacao.id, title: "Proposta Horizonte", startAt: addDays(addHours(today, 9), 2), endAt: addDays(addHours(today, 10), 2), color: "#A78BFA" }
+      { userId: admin.id, clientId: atlas.id, projectId: portalAtlas.id, categoryId: premium.id, type: "MEETING", title: "Reuniao estrategica - Atlas", startAt: addHours(today, 10), endAt: addHours(today, 11), color: "#3B82F6" },
+      { userId: admin.id, clientId: mariana.id, projectId: consultoriaMariana.id, categoryId: consultoria.id, type: "FOLLOW_UP", title: "Follow-up Mariana", startAt: addHours(today, 14), endAt: addHours(today, 15), color: "#2DD4BF" },
+      { userId: admin.id, clientId: horizonte.id, categoryId: renovacao.id, type: "DEMONSTRATION", title: "Proposta Horizonte", startAt: addDays(addHours(today, 9), 2), endAt: addDays(addHours(today, 10), 2), color: "#A78BFA" }
     ]
   });
 

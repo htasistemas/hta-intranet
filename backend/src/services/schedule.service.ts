@@ -28,11 +28,12 @@ export class ScheduleService {
   }
 
   public async create(input: ScheduleInput, userId: string) {
-    const { clientId, categoryId, reminderAt, ...data } = input;
+    const { clientId, projectId, categoryId, reminderAt, ...data } = input;
     const schedule = await this.repository.create({
       ...data,
       user: { connect: { id: userId } },
       ...(clientId ? { client: { connect: { id: clientId } } } : {}),
+      ...(projectId ? { project: { connect: { id: projectId } } } : {}),
       ...(categoryId ? { category: { connect: { id: categoryId } } } : {}),
       ...(reminderAt ? { reminders: { create: { remindAt: reminderAt } } } : {})
     });
@@ -44,10 +45,11 @@ export class ScheduleService {
   public async update(id: string, input: ScheduleInput, userId: string) {
     const existing = await prisma.schedule.findFirst({ where: { id, userId } });
     if (!existing) throw new ApiError(404, "Compromisso nao encontrado.");
-    const { clientId, categoryId, reminderAt, ...data } = input;
+    const { clientId, projectId, categoryId, reminderAt, ...data } = input;
     const schedule = await this.repository.update(id, {
       ...data,
       client: clientId ? { connect: { id: clientId } } : { disconnect: true },
+      project: projectId ? { connect: { id: projectId } } : { disconnect: true },
       category: categoryId ? { connect: { id: categoryId } } : { disconnect: true },
       ...(reminderAt ? { reminders: { create: { remindAt: reminderAt } } } : {})
     });

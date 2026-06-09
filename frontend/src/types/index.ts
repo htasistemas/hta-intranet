@@ -2,6 +2,9 @@ export type ClientStatus = "ACTIVE" | "INACTIVE" | "PROSPECT";
 export type TaskStatus = "NOT_STARTED" | "IN_PROGRESS" | "PAUSED" | "COMPLETED";
 export type Priority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 export type ProjectStatus = "PLANNING" | "ACTIVE" | "ON_HOLD" | "COMPLETED" | "CANCELLED";
+export type ProductType = "PRODUCT" | "SERVICE" | "SUBSCRIPTION" | "LICENSE" | "PROJECT";
+export type ProductStatus = "ACTIVE" | "INACTIVE";
+export type ClientProductStatus = "ACTIVE" | "SUSPENDED" | "CANCELLED" | "EXPIRED";
 
 export interface Category {
   id: string;
@@ -57,6 +60,7 @@ export interface Client {
   consentDate?: string | null;
   observations?: string | null;
   projectLinks?: Array<{ project: Project }>;
+  products?: ClientProduct[];
 }
 
 export interface Schedule {
@@ -67,11 +71,14 @@ export interface Schedule {
   endAt: string;
   color: string | null;
   allDay: boolean;
+  status: "SCHEDULED" | "COMPLETED" | "CANCELLED";
   googleEventId?: string | null;
   googleCalendarId?: string | null;
   googleSyncedAt?: string | null;
   googleSyncStatus?: string | null;
+  type?: string;
   client?: Client | null;
+  project?: Project | null;
 }
 
 export interface Task {
@@ -100,7 +107,42 @@ export interface Project {
   progress: number;
   color: string;
   client?: Client | null;
+  product?: ProductService | null;
   _count?: { tasks: number };
+}
+
+export interface ProductService {
+  id: string;
+  code: string;
+  name: string;
+  type: ProductType;
+  category: string | null;
+  commercialDescription: string | null;
+  technicalDescription: string | null;
+  unit: string | null;
+  price: string | number | null;
+  cost: string | number | null;
+  margin: string | number | null;
+  status: ProductStatus;
+  sla: string | null;
+  deliveryTime: string | null;
+  technicalOwner: string | null;
+  fiscalNotes: string | null;
+  _count?: { clientProducts: number; projects: number };
+}
+
+export interface ClientProduct {
+  id: string;
+  clientId: string;
+  productId: string;
+  startDate: string | null;
+  renewalDate: string | null;
+  contractedValue: string | number | null;
+  status: ClientProductStatus;
+  responsible: string | null;
+  notes: string | null;
+  client: Client;
+  product: ProductService;
 }
 
 export interface DashboardData {

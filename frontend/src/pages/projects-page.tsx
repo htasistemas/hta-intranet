@@ -41,6 +41,7 @@ export default function ProjectsPage() {
   const cancel = useMutation({
     mutationFn: (project: Project) => api.put<Project>(`/projects/${project.id}`, {
       clientId: project.client?.id ?? null,
+      productId: project.product?.id ?? null,
       name: project.name,
       code: project.code,
       description: project.description,

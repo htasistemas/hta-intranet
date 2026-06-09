@@ -5,6 +5,7 @@ import { pagination } from "../utils/pagination.js";
 
 const includeRelations = {
   client: true,
+  product: true,
   _count: { select: { tasks: true } }
 } satisfies Prisma.ProjectInclude;
 

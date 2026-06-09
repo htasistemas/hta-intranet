@@ -25,11 +25,12 @@ export class ProjectService {
   }
 
   public async create(input: ProjectInput, userId: string) {
-    const { clientId, ...data } = input;
+    const { clientId, productId, ...data } = input;
     const project = await this.repository.create({
       ...data,
       owner: { connect: { id: userId } },
-      ...(clientId ? { client: { connect: { id: clientId } } } : {})
+      ...(clientId ? { client: { connect: { id: clientId } } } : {}),
+      ...(productId ? { product: { connect: { id: productId } } } : {})
     });
     await this.auditRepository.log({ userId, clientId: clientId ?? undefined, entity: "Project", entityId: project.id, action: "CREATED" });
     return project;
@@ -37,10 +38,11 @@ export class ProjectService {
 
   public async update(id: string, input: ProjectInput, userId: string) {
     await this.get(id, userId);
-    const { clientId, ...data } = input;
+    const { clientId, productId, ...data } = input;
     const project = await this.repository.update(id, {
       ...data,
-      client: clientId ? { connect: { id: clientId } } : { disconnect: true }
+      client: clientId ? { connect: { id: clientId } } : { disconnect: true },
+      ...(productId !== undefined ? { product: productId ? { connect: { id: productId } } : { disconnect: true } } : {})
     });
     await this.auditRepository.log({ userId, clientId: clientId ?? undefined, entity: "Project", entityId: id, action: "UPDATED" });
     return project;

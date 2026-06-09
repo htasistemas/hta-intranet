@@ -9,6 +9,7 @@ const DashboardPage = lazy(() => import("@/pages/dashboard-page"));
 const CrmPage = lazy(() => import("@/pages/crm-page"));
 const ClientsPage = lazy(() => import("@/pages/clients-page"));
 const CustomerPortalPage = lazy(() => import("@/pages/customer-portal-page"));
+const ProductsPage = lazy(() => import("@/pages/products-page"));
 const ProjectsPage = lazy(() => import("@/pages/projects-page"));
 const CalendarPage = lazy(() => import("@/pages/calendar-page"));
 const TasksPage = lazy(() => import("@/pages/tasks-page"));
@@ -29,6 +30,7 @@ export default function App() {
           <Route path="/crm-comercial" element={<CrmPage />} />
           <Route path="/clientes" element={<ClientsPage />} />
           <Route path="/portal-cliente" element={<CustomerPortalPage />} />
+          <Route path="/produtos" element={<ProductsPage />} />
           <Route path="/projetos" element={<ProjectsPage />} />
           <Route path="/agenda" element={<CalendarPage />} />
           <Route path="/tarefas" element={<TasksPage />} />

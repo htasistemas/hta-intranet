@@ -14,6 +14,7 @@ import {
   FolderKanban,
   LogOut,
   Menu,
+  Package,
   Search,
   Settings,
   Sparkles,
@@ -46,6 +47,7 @@ const navigation: NavigationGroup[] = [
       { label: "CRM Comercial", href: "/crm-comercial", icon: Handshake },
       { label: "Portal Cliente", href: "/portal-cliente", icon: PanelsTopLeft },
       { label: "Clientes", href: "/clientes", icon: ContactRound },
+      { label: "Produtos", href: "/produtos", icon: Package },
       { label: "Projetos", href: "/projetos", icon: FolderKanban }
     ]
   },

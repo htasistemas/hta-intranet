@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { api } from "@/services/api";
-import type { Client, PageResult, Project } from "@/types";
+import type { Client, PageResult, ProductService, Project } from "@/types";
 import { Button } from "@/components/ui/button";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input, Textarea } from "@/components/ui/input";
@@ -13,6 +13,7 @@ const schema = z.object({
   name: z.string().min(2, "Informe o nome."),
   code: z.string().min(2, "Informe o codigo."),
   clientId: z.string(),
+  productId: z.string(),
   description: z.string(),
   status: z.enum(["PLANNING", "ACTIVE", "ON_HOLD", "COMPLETED", "CANCELLED"]),
   priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]),
@@ -28,6 +29,7 @@ const defaults: Fields = {
   name: "",
   code: "",
   clientId: "",
+  productId: "",
   description: "",
   status: "PLANNING",
   priority: "MEDIUM",
@@ -40,11 +42,14 @@ const defaults: Fields = {
 
 export function ProjectForm({ project, onSave, onCancel }: { project?: Project; onSave: (input: Record<string, unknown>) => Promise<void>; onCancel: () => void }) {
   const { data } = useQuery({ queryKey: ["clients", "project-selector"], queryFn: () => api.get<PageResult<Client>>("/clients?pageSize=100") });
+  const { data: productsResult } = useQuery({ queryKey: ["products", "project-selector"], queryFn: () => api.get<PageResult<ProductService>>("/products?pageSize=100") });
+  const products = productsResult?.data ?? [];
   const values: Fields = project ? {
     ...defaults,
     name: project.name,
     code: project.code,
     clientId: project.client?.id ?? "",
+    productId: project.product?.id ?? "",
     description: project.description ?? "",
     status: project.status,
     priority: project.priority,
@@ -59,6 +64,7 @@ export function ProjectForm({ project, onSave, onCancel }: { project?: Project; 
     ...fields,
     code: fields.code.toUpperCase(),
     clientId: fields.clientId || null,
+    productId: fields.productId || null,
     startDate: fields.startDate ? new Date(fields.startDate).toISOString() : null,
     dueDate: fields.dueDate ? new Date(fields.dueDate).toISOString() : null,
     budget: currencyInputToNumber(fields.budget)
@@ -72,6 +78,12 @@ export function ProjectForm({ project, onSave, onCancel }: { project?: Project; 
           <select className="h-11 w-full rounded-xl border border-slate-700 bg-sidebar px-3" {...register("clientId")}>
             <option value="">Sem cliente vinculado</option>
             {data?.data.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}
+          </select>
+        </label>
+        <label>Produto/servico
+          <select className="h-11 w-full rounded-xl border border-slate-700 bg-sidebar px-3" {...register("productId")}>
+            <option value="">Sem produto vinculado</option>
+            {products.map((product) => <option key={product.id} value={product.id}>{product.code} - {product.name}</option>)}
           </select>
         </label>
         <label>Cor<Input type="color" {...register("color")} /></label>

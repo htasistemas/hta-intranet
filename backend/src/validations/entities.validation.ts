@@ -54,7 +54,9 @@ export const clientSchema = z.object({
 
 export const scheduleSchema = z.object({
   clientId: optionalText,
+  projectId: optionalText,
   categoryId: optionalText,
+  type: z.enum(["CALL", "MEETING", "VISIT", "DEMONSTRATION", "FOLLOW_UP", "IMPLEMENTATION", "TRAINING", "SUPPORT", "BILLING"]).default("FOLLOW_UP"),
   title: z.string().trim().min(2),
   description: optionalText,
   location: optionalText,
@@ -82,6 +84,7 @@ export const taskSchema = z.object({
 
 export const projectSchema = z.object({
   clientId: optionalText,
+  productId: optionalText,
   name: z.string().trim().min(2),
   code: z.string().trim().min(2).max(30).transform((value) => value.toUpperCase()),
   description: optionalText,
@@ -101,6 +104,35 @@ export const categorySchema = z.object({ name: z.string().trim().min(2), color: 
 export const noteSchema = z.object({ clientId: optionalText, title: z.string().trim().min(2), content: z.string().trim().min(2) });
 export const userUpdateSchema = z.object({ name: z.string().min(2).optional(), theme: z.enum(["dark", "light"]).optional(), notifications: z.boolean().optional() });
 export const userCreateSchema = z.object({ name: z.string().min(2), email: z.string().email(), password: z.string().min(6), role: z.enum(["ADMIN", "MANAGER", "USER"]).default("USER") });
+
+export const productServiceSchema = z.object({
+  code: z.string().trim().min(2).max(40).transform((value) => value.toUpperCase()),
+  name: z.string().trim().min(2),
+  type: z.enum(["PRODUCT", "SERVICE", "SUBSCRIPTION", "LICENSE", "PROJECT"]).default("SERVICE"),
+  category: optionalText,
+  commercialDescription: optionalText,
+  technicalDescription: optionalText,
+  unit: optionalText,
+  price: z.coerce.number().nonnegative().optional().nullable(),
+  cost: z.coerce.number().nonnegative().optional().nullable(),
+  margin: z.coerce.number().nonnegative().optional().nullable(),
+  status: z.enum(["ACTIVE", "INACTIVE"]).default("ACTIVE"),
+  sla: optionalText,
+  deliveryTime: optionalText,
+  technicalOwner: optionalText,
+  fiscalNotes: optionalText
+});
+
+export const clientProductSchema = z.object({
+  clientId: z.string().min(1),
+  productId: z.string().min(1),
+  startDate: z.coerce.date().optional().nullable(),
+  renewalDate: z.coerce.date().optional().nullable(),
+  contractedValue: z.coerce.number().nonnegative().optional().nullable(),
+  status: z.enum(["ACTIVE", "SUSPENDED", "CANCELLED", "EXPIRED"]).default("ACTIVE"),
+  responsible: optionalText,
+  notes: optionalText
+});
 
 export const crmLeadSchema = z.object({
   name: z.string().trim().min(2),
