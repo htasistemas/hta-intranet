@@ -5,6 +5,18 @@ export type ProjectStatus = "PLANNING" | "ACTIVE" | "ON_HOLD" | "COMPLETED" | "C
 export type ProductType = "PRODUCT" | "SERVICE" | "SUBSCRIPTION" | "LICENSE" | "PROJECT";
 export type ProductStatus = "ACTIVE" | "INACTIVE";
 export type ClientProductStatus = "ACTIVE" | "SUSPENDED" | "CANCELLED" | "EXPIRED";
+export type UserRole = "ADMIN" | "MANAGER" | "USER";
+
+export interface UserAccount {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  theme: "dark" | "light";
+  notifications: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface Category {
   id: string;
@@ -165,7 +177,7 @@ export interface DashboardData {
 export interface Session {
   accessToken: string;
   refreshToken: string;
-  user: { id: string; name: string; email: string; role: string };
+  user: { id: string; name: string; email: string; role: UserRole };
 }
 
 export interface PageResult<T> {

@@ -18,6 +18,7 @@ import {
   Search,
   Settings,
   Sparkles,
+  UserCog,
   X,
   type LucideIcon
 } from "lucide-react";
@@ -42,7 +43,7 @@ const navigation: NavigationGroup[] = [
   {
     title: "Controle Empresarial",
     items: [
-      { label: "Agenda", href: "/agenda", icon: CalendarDays },
+      { label: "Agenda Profissional", href: "/agenda", icon: CalendarDays },
       { label: "Gestao Pessoal", href: "/tarefas", icon: ClipboardList },
       { label: "CRM Comercial", href: "/crm-comercial", icon: Handshake },
       { label: "Portal Cliente", href: "/portal-cliente", icon: PanelsTopLeft },
@@ -55,13 +56,14 @@ const navigation: NavigationGroup[] = [
     title: "Sistema",
     items: [
       { label: "Relatorios", href: "/relatorios", icon: FileBarChart },
+      { label: "Usuarios", href: "/usuarios", icon: UserCog },
       { label: "Configuracoes", href: "/configuracoes", icon: Settings }
     ]
   }
 ];
 
 const sidebarStorageKey = "htasistemas.sidebar.collapsed";
-const routeTitles: Record<string, string> = { "/calculadora": "Calculadora" };
+const routeTitles: Record<string, string> = { "/calculadora": "Calculadora", "/usuarios": "Usuarios" };
 
 function groupsInitiallyOpen(): Record<string, boolean> {
   return Object.fromEntries(navigation.map((group) => [group.title, true]));

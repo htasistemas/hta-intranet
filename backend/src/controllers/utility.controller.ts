@@ -1,10 +1,22 @@
 import type { Request, Response } from "express";
+import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "../prisma/client.js";
 import { ApiError } from "../utils/api-error.js";
 import { DashboardService } from "../services/dashboard.service.js";
 import { SearchService } from "../services/search.service.js";
 import bcrypt from "bcryptjs";
+
+type UserRoleInput = "ADMIN" | "MANAGER" | "USER";
+
+interface UserAdminUpdateInput {
+  name?: string;
+  email?: string;
+  password?: string;
+  role?: UserRoleInput;
+  theme?: "dark" | "light";
+  notifications?: boolean;
+}
 
 function userId(request: Request): string {
   if (!request.auth) throw new ApiError(401, "Nao autenticado.");
@@ -139,12 +151,15 @@ export class UtilityController {
   };
 
   public createUser = async (request: Request, response: Response): Promise<void> => {
-    const { password, ...data } = request.body as { name: string; email: string; password: string; role: "ADMIN" | "MANAGER" | "USER" };
+    const { password, ...data } = request.body as { name: string; email: string; password: string; role: UserRoleInput; theme: "dark" | "light"; notifications: boolean };
     response.status(201).json(await prisma.user.create({ data: { ...data, passwordHash: await bcrypt.hash(password, 12) }, omit: { passwordHash: true } }));
   };
 
   public updateUser = async (request: Request, response: Response): Promise<void> => {
-    response.json(await prisma.user.update({ where: { id: resourceId(request) }, data: request.body, omit: { passwordHash: true } }));
+    const { password, ...data } = request.body as UserAdminUpdateInput;
+    const updateData: Prisma.UserUpdateInput = { ...data };
+    if (password) updateData.passwordHash = await bcrypt.hash(password, 12);
+    response.json(await prisma.user.update({ where: { id: resourceId(request) }, data: updateData, omit: { passwordHash: true } }));
   };
 
   public deleteUser = async (request: Request, response: Response): Promise<void> => {

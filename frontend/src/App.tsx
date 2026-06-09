@@ -16,6 +16,7 @@ const TasksPage = lazy(() => import("@/pages/tasks-page"));
 const CalculatorPage = lazy(() => import("@/pages/calculator-page"));
 const ReportsPage = lazy(() => import("@/pages/reports-page"));
 const SettingsPage = lazy(() => import("@/pages/settings-page"));
+const UsersPage = lazy(() => import("@/pages/users-page"));
 
 function Loading() { return <div className="p-8"><Skeleton className="h-80" /></div>; }
 
@@ -36,6 +37,7 @@ export default function App() {
           <Route path="/tarefas" element={<TasksPage />} />
           <Route path="/calculadora" element={<CalculatorPage />} />
           <Route path="/relatorios" element={<ReportsPage />} />
+          <Route path="/usuarios" element={<UsersPage />} />
           <Route path="/configuracoes" element={<SettingsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

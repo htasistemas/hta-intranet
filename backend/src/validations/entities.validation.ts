@@ -103,7 +103,22 @@ export const projectSchema = z.object({
 export const categorySchema = z.object({ name: z.string().trim().min(2), color: z.string().regex(/^#[0-9a-f]{6}$/i) });
 export const noteSchema = z.object({ clientId: optionalText, title: z.string().trim().min(2), content: z.string().trim().min(2) });
 export const userUpdateSchema = z.object({ name: z.string().min(2).optional(), theme: z.enum(["dark", "light"]).optional(), notifications: z.boolean().optional() });
-export const userCreateSchema = z.object({ name: z.string().min(2), email: z.string().email(), password: z.string().min(6), role: z.enum(["ADMIN", "MANAGER", "USER"]).default("USER") });
+export const userCreateSchema = z.object({
+  name: z.string().min(2),
+  email: z.string().email(),
+  password: z.string().min(6),
+  role: z.enum(["ADMIN", "MANAGER", "USER"]).default("USER"),
+  theme: z.enum(["dark", "light"]).default("dark"),
+  notifications: z.boolean().default(true)
+});
+export const userAdminUpdateSchema = z.object({
+  name: z.string().min(2).optional(),
+  email: z.string().email().optional(),
+  password: z.string().min(6).optional(),
+  role: z.enum(["ADMIN", "MANAGER", "USER"]).optional(),
+  theme: z.enum(["dark", "light"]).optional(),
+  notifications: z.boolean().optional()
+});
 
 export const productServiceSchema = z.object({
   code: z.string().trim().min(2).max(40).transform((value) => value.toUpperCase()),

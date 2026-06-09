@@ -36,6 +36,7 @@ import {
   projectSchema,
   scheduleSchema,
   taskSchema,
+  userAdminUpdateSchema,
   userCreateSchema,
   userUpdateSchema
 } from "../validations/entities.validation.js";
@@ -118,7 +119,7 @@ apiRouter.get("/users/me", asyncHandler(utility.profile));
 apiRouter.put("/users/me", validateBody(userUpdateSchema), asyncHandler(utility.updateProfile));
 apiRouter.get("/users", requireAdmin, asyncHandler(utility.users));
 apiRouter.post("/users", requireAdmin, validateBody(userCreateSchema), asyncHandler(utility.createUser));
-apiRouter.put("/users/:id", requireAdmin, validateBody(userUpdateSchema), asyncHandler(utility.updateUser));
+apiRouter.put("/users/:id", requireAdmin, validateBody(userAdminUpdateSchema), asyncHandler(utility.updateUser));
 apiRouter.delete("/users/:id", requireAdmin, asyncHandler(utility.deleteUser));
 apiRouter.get("/reports/clients.csv", asyncHandler(reports.clientsCsv));
 apiRouter.get("/reports/clients.pdf", asyncHandler(reports.clientsPdf));
