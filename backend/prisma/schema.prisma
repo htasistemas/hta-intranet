@@ -252,6 +252,12 @@ model Client {
   name          String
   document      String?         @unique
   type          ClientType      @default(INDIVIDUAL)
+  internalCode  String?
+  legalName     String?
+  tradeName     String?
+  stateRegistration String?
+  municipalRegistration String?
+  openingDate   DateTime?
   birthDate     DateTime?
   gender        String?
   email         String?
@@ -265,7 +271,28 @@ model Client {
   state         String?
   observations  String?
   status        ClientStatus    @default(PROSPECT)
+  source        String?
+  segment       String?
+  companySize   String?
+  responsible   String?
+  priority      String?
+  temperature   String?
+  firstPurchaseAt DateTime?
+  lastPurchaseAt DateTime?
+  nextFollowUpAt DateTime?
   expectedValue Decimal?        @db.Decimal(12, 2)
+  averageTicket Decimal?        @db.Decimal(12, 2)
+  purchasePotential Decimal?    @db.Decimal(12, 2)
+  creditLimit   Decimal?        @db.Decimal(12, 2)
+  paymentTerms  String?
+  preferredPaymentMethod String?
+  billingDay    Int?
+  financialStatus String?
+  financialNotes String?
+  allowEmailMarketing Boolean   @default(false)
+  allowWhatsapp Boolean         @default(false)
+  allowCalls    Boolean         @default(false)
+  consentDate   DateTime?
   categoryId    String?
   category      Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   createdAt     DateTime        @default(now())
