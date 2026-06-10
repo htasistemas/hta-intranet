@@ -12,7 +12,77 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ClientForm } from "@/components/clients/client-form";
 import { ClientImportDialog } from "@/components/clients/client-import-dialog";
 import { useToast } from "@/contexts/toast-context";
-import { cn } from "@/lib/utils";
+import { cn, currency } from "@/lib/utils";
+
+interface LinkedItem {
+  id: string;
+  label: string;
+  kind: "Projeto" | "Produto";
+}
+
+const statusLabels: Record<Client["status"], string> = {
+  ACTIVE: "Ativo",
+  INACTIVE: "Inativo",
+  PROSPECT: "Prospect"
+};
+
+const statusClasses: Record<Client["status"], string> = {
+  ACTIVE: "bg-emerald-500/10 text-emerald-300",
+  INACTIVE: "bg-slate-500/10 text-slate-300",
+  PROSPECT: "bg-amber-500/10 text-amber-300"
+};
+
+function linkedItems(client: Client): LinkedItem[] {
+  const items: LinkedItem[] = [];
+  const keys = new Set<string>();
+  const add = (item: LinkedItem) => {
+    const key = `${item.kind}:${item.id}`;
+    if (keys.has(key)) return;
+    keys.add(key);
+    items.push(item);
+  };
+
+  client.projects?.forEach((project) => {
+    add({ id: project.id, label: project.name, kind: "Projeto" });
+    if (project.product) add({ id: project.product.id, label: project.product.name, kind: "Produto" });
+  });
+  client.projectLinks?.forEach(({ project }) => {
+    add({ id: project.id, label: project.name, kind: "Projeto" });
+    if (project.product) add({ id: project.product.id, label: project.product.name, kind: "Produto" });
+  });
+  client.products?.forEach(({ product }) => add({ id: product.id, label: product.name, kind: "Produto" }));
+
+  return items;
+}
+
+function ClientIdentity({ client }: { client: Client }) {
+  return (
+    <>
+      <span>{client.name}</span>
+      <span className="block text-xs font-normal text-slate-300">{client.document ?? "CPF/CNPJ nao informado"}</span>
+      {client.email ? <span className="block text-xs font-normal text-slate-400">{client.email}</span> : null}
+    </>
+  );
+}
+
+function LinkedItemsCell({ client }: { client: Client }) {
+  const items = linkedItems(client);
+  const visibleItems = items.slice(0, 3);
+  const hiddenCount = items.length - visibleItems.length;
+
+  if (!items.length) return <span className="text-slate-500">-</span>;
+
+  return (
+    <div className="flex max-w-[260px] flex-wrap gap-1.5">
+      {visibleItems.map((item) => (
+        <span key={`${item.kind}-${item.id}`} className="rounded-md border border-slate-700 bg-slate-900/70 px-2 py-1 text-xs text-slate-200" title={`${item.kind}: ${item.label}`}>
+          <span className="text-slate-400">{item.kind}: </span>{item.label}
+        </span>
+      ))}
+      {hiddenCount > 0 ? <span className="rounded-md border border-slate-700 px-2 py-1 text-xs text-slate-400">+{hiddenCount}</span> : null}
+    </div>
+  );
+}
 
 export default function ClientsPage() {
   const [search, setSearch] = useState("");
@@ -80,16 +150,17 @@ export default function ClientsPage() {
             {data?.data.map((client) => (
               <Card key={client.id} className="cursor-pointer" onClick={() => openClient(client)}>
                 <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <button type="button" className="truncate text-left font-semibold text-foreground transition hover:text-accent" onClick={(event) => { event.stopPropagation(); openClient(client); }}>{client.name}</button>
-                    <p className="truncate text-sm text-slate-400">{client.email ?? "Sem email"}</p>
-                  </div>
-                  <span className="shrink-0 rounded-full bg-accent/10 px-3 py-1 text-xs text-accent">{client.status}</span>
+                  <button type="button" className="min-w-0 truncate text-left font-semibold text-foreground transition hover:text-accent" onClick={(event) => { event.stopPropagation(); openClient(client); }}>
+                    <ClientIdentity client={client} />
+                  </button>
+                  <span className={`shrink-0 rounded-full px-3 py-1 text-xs ${statusClasses[client.status]}`}>{statusLabels[client.status]}</span>
                 </div>
                 <div className="mt-4 grid gap-2 text-sm text-slate-300">
                   <p>{client.phone ?? client.whatsapp ?? "Telefone nao informado"}</p>
                   <p>{[client.city, client.state].filter(Boolean).join(" / ") || "Localidade nao informada"}</p>
                   <p>{client.category?.name ?? "Sem categoria"}</p>
+                  <LinkedItemsCell client={client} />
+                  <p>{currency(Number(client.expectedValue ?? 0))}</p>
                 </div>
                 <div className="mt-4 flex justify-end gap-1" onClick={(event) => event.stopPropagation()}>
                   <Button variant="outline" size="sm" onClick={() => moveToProspecting.mutate(client.id)} disabled={moveToProspecting.isPending} aria-label="Voltar para captacao"><UserPlus size={17} /> Captacao</Button>
@@ -101,14 +172,17 @@ export default function ClientsPage() {
           </section>
         ) : (
           <Card className="overflow-x-auto p-0">
-            <table className="w-full min-w-[820px] text-left text-sm">
-              <thead className="border-b border-slate-700 text-xs uppercase text-slate-400"><tr><th className="p-5">Cliente</th><th>Telefone</th><th>Status</th><th>Categoria</th><th>Localidade</th><th /></tr></thead>
+            <table className="w-full min-w-[980px] text-left text-sm">
+              <thead className="border-b border-slate-700 text-xs uppercase text-slate-400"><tr><th className="p-5">Cliente</th><th>Telefone</th><th>Status</th><th>Categoria</th><th>Projeto / Produto</th><th>Localidade</th><th>Receita</th><th /></tr></thead>
               <tbody>{data?.data.map((client) => (
                 <tr key={client.id} className="border-b border-slate-700/50 transition hover:bg-white/[.025]">
-                  <td className="p-5"><button type="button" className="text-left font-medium transition hover:text-accent" onClick={() => openClient(client)}>{client.name}</button><p className="text-xs text-slate-400">{client.email}</p></td>
+                  <td className="p-5"><button type="button" className="text-left font-medium transition hover:text-accent" onClick={() => openClient(client)}><ClientIdentity client={client} /></button></td>
                   <td>{client.phone ?? client.whatsapp ?? "-"}</td>
-                  <td><span className="rounded-full bg-accent/10 px-3 py-1 text-xs text-accent">{client.status}</span></td>
-                  <td>{client.category?.name ?? "-"}</td><td>{[client.city, client.state].filter(Boolean).join(" / ") || "-"}</td>
+                  <td><span className={`rounded-full px-3 py-1 text-xs ${statusClasses[client.status]}`}>{statusLabels[client.status]}</span></td>
+                  <td>{client.category?.name ?? "-"}</td>
+                  <td><LinkedItemsCell client={client} /></td>
+                  <td>{[client.city, client.state].filter(Boolean).join(" / ") || "-"}</td>
+                  <td>{currency(Number(client.expectedValue ?? 0))}</td>
                   <td>
                     <div className="flex justify-end gap-1 pr-3">
                       <Button variant="outline" size="sm" onClick={() => moveToProspecting.mutate(client.id)} disabled={moveToProspecting.isPending} aria-label="Voltar para captacao"><UserPlus size={17} /> Captacao</Button>

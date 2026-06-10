@@ -2,6 +2,44 @@ import { z } from "zod";
 
 const optionalText = z.string().trim().optional().nullable();
 
+function onlyDigits(value: string): string {
+  return value.replace(/\D/g, "");
+}
+
+function isRepeatedDigits(value: string): boolean {
+  return /^(\d)\1+$/.test(value);
+}
+
+function calculateCpfDigit(numbers: number[], factor: number): number {
+  const total = numbers.reduce((sum, number) => sum + number * factor--, 0);
+  const digit = 11 - (total % 11);
+  return digit >= 10 ? 0 : digit;
+}
+
+function isValidCpf(value: string): boolean {
+  const digits = onlyDigits(value);
+  if (digits.length !== 11 || isRepeatedDigits(digits)) return false;
+  const numbers = digits.split("").map(Number);
+  const firstDigit = calculateCpfDigit(numbers.slice(0, 9), 10);
+  const secondDigit = calculateCpfDigit([...numbers.slice(0, 9), firstDigit], 11);
+  return firstDigit === numbers[9] && secondDigit === numbers[10];
+}
+
+function calculateCnpjDigit(numbers: number[], factors: number[]): number {
+  const total = numbers.reduce((sum, number, index) => sum + number * (factors[index] ?? 0), 0);
+  const remainder = total % 11;
+  return remainder < 2 ? 0 : 11 - remainder;
+}
+
+function isValidCnpj(value: string): boolean {
+  const digits = onlyDigits(value);
+  if (digits.length !== 14 || isRepeatedDigits(digits)) return false;
+  const numbers = digits.split("").map(Number);
+  const firstDigit = calculateCnpjDigit(numbers.slice(0, 12), [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
+  const secondDigit = calculateCnpjDigit([...numbers.slice(0, 12), firstDigit], [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
+  return firstDigit === numbers[12] && secondDigit === numbers[13];
+}
+
 export const clientSchema = z.object({
   name: z.string().trim().min(2),
   document: optionalText,
@@ -50,6 +88,27 @@ export const clientSchema = z.object({
   categoryId: optionalText,
   tagIds: z.array(z.string()).default([]),
   projectIds: z.array(z.string()).default([])
+}).superRefine((fields, context) => {
+  const document = fields.document ?? "";
+  const documentDigits = onlyDigits(document);
+  if (documentDigits.length > 0) {
+    const validDocument = fields.type === "COMPANY" ? isValidCnpj(documentDigits) : isValidCpf(documentDigits);
+    if (!validDocument) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: fields.type === "COMPANY" ? "Informe um CNPJ valido." : "Informe um CPF valido.",
+        path: ["document"]
+      });
+    }
+  }
+  const hasContact = Boolean((fields.email ?? "").trim() || onlyDigits(fields.phone ?? "") || onlyDigits(fields.whatsapp ?? ""));
+  if (!hasContact) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Informe email, telefone ou WhatsApp.",
+      path: ["email"]
+    });
+  }
 });
 
 export const clientImportRequestSchema = z.object({

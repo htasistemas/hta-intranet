@@ -72,6 +72,7 @@ export interface Client {
   consentDate?: string | null;
   observations?: string | null;
   projectLinks?: Array<{ project: Project }>;
+  projects?: Project[];
   products?: ClientProduct[];
 }
 

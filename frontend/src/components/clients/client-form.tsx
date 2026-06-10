@@ -1,5 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { Search, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Controller, useForm, useWatch, type SubmitErrorHandler } from "react-hook-form";
 import { z } from "zod";
@@ -59,6 +60,27 @@ const schema = z.object({
   allowCalls: z.boolean(),
   consentDate: z.string(),
   projectIds: z.array(z.string())
+}).superRefine((fields, context) => {
+  const documentDigits = onlyDigits(fields.document);
+  if (documentDigits.length > 0) {
+    const validDocument = fields.type === "COMPANY" ? isValidCnpj(documentDigits) : isValidCpf(documentDigits);
+    if (!validDocument) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: fields.type === "COMPANY" ? "Informe um CNPJ valido." : "Informe um CPF valido.",
+        path: ["document"]
+      });
+    }
+  }
+
+  const hasContact = Boolean(fields.email.trim() || onlyDigits(fields.phone) || onlyDigits(fields.whatsapp));
+  if (!hasContact) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Informe email, telefone ou WhatsApp.",
+      path: ["email"]
+    });
+  }
 });
 
 type Fields = z.infer<typeof schema>;
@@ -178,6 +200,40 @@ function onlyDigits(value: string): string {
   return value.replace(/\D/g, "");
 }
 
+function isRepeatedDigits(value: string): boolean {
+  return /^(\d)\1+$/.test(value);
+}
+
+function calculateCpfDigit(numbers: number[], factor: number): number {
+  const total = numbers.reduce((sum, number) => sum + number * factor--, 0);
+  const digit = 11 - (total % 11);
+  return digit >= 10 ? 0 : digit;
+}
+
+function isValidCpf(value: string): boolean {
+  const digits = onlyDigits(value);
+  if (digits.length !== 11 || isRepeatedDigits(digits)) return false;
+  const numbers = digits.split("").map(Number);
+  const firstDigit = calculateCpfDigit(numbers.slice(0, 9), 10);
+  const secondDigit = calculateCpfDigit([...numbers.slice(0, 9), firstDigit], 11);
+  return firstDigit === numbers[9] && secondDigit === numbers[10];
+}
+
+function calculateCnpjDigit(numbers: number[], factors: number[]): number {
+  const total = numbers.reduce((sum, number, index) => sum + number * (factors[index] ?? 0), 0);
+  const remainder = total % 11;
+  return remainder < 2 ? 0 : 11 - remainder;
+}
+
+function isValidCnpj(value: string): boolean {
+  const digits = onlyDigits(value);
+  if (digits.length !== 14 || isRepeatedDigits(digits)) return false;
+  const numbers = digits.split("").map(Number);
+  const firstDigit = calculateCnpjDigit(numbers.slice(0, 12), [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
+  const secondDigit = calculateCnpjDigit([...numbers.slice(0, 12), firstDigit], [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
+  return firstDigit === numbers[12] && secondDigit === numbers[13];
+}
+
 function maskCpf(value: string): string {
   const digits = onlyDigits(value).slice(0, 11);
   return digits.replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d{1,2})$/, "$1-$2");
@@ -261,6 +317,7 @@ async function fetchWithTimeout<T>(url: string): Promise<T> {
 
 async function lookupCep(cep: string): Promise<CepLookup> {
   const digits = onlyDigits(cep);
+  if (digits.length !== 8) throw new Error("Informe um CEP completo.");
   try {
     return await api.get<CepLookup>(`/lookup/cep/${digits}`);
   } catch {
@@ -278,6 +335,7 @@ async function lookupCep(cep: string): Promise<CepLookup> {
 
 async function lookupCnpj(cnpj: string): Promise<CnpjLookup> {
   const digits = onlyDigits(cnpj);
+  if (digits.length !== 14) throw new Error("Informe um CNPJ completo.");
   try {
     return await api.get<CnpjLookup>(`/lookup/cnpj/${digits}`);
   } catch {
@@ -357,6 +415,69 @@ function FieldError({ message }: { message?: string }) {
   return message ? <small className="text-red-400">{message}</small> : null;
 }
 
+function normalizeText(value: string): string {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+function ProjectSelector({ projects, selectedIds, onChange }: { projects: Project[]; selectedIds: string[]; onChange: (ids: string[]) => void }) {
+  const [projectSearch, setProjectSearch] = useState("");
+  const selectedProjects = projects.filter((project) => selectedIds.includes(project.id));
+  const normalizedSearch = normalizeText(projectSearch);
+  const filteredProjects = projects.filter((project) => normalizeText(`${project.code} ${project.name}`).includes(normalizedSearch));
+
+  const toggleProject = (projectId: string): void => {
+    if (selectedIds.includes(projectId)) {
+      onChange(selectedIds.filter((selectedId) => selectedId !== projectId));
+      return;
+    }
+    onChange([...selectedIds, projectId]);
+  };
+
+  return (
+    <div className="space-y-3">
+      <label className="relative block">
+        <span className="sr-only">Buscar projeto</span>
+        <Search className="absolute left-3 top-3 text-slate-500" size={18} />
+        <Input className="pl-10" value={projectSearch} onChange={(event) => setProjectSearch(event.target.value)} placeholder="Buscar por codigo ou nome" />
+      </label>
+      {selectedProjects.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {selectedProjects.map((project) => (
+            <button
+              key={project.id}
+              type="button"
+              className="inline-flex max-w-full items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-3 py-1 text-xs text-accent"
+              onClick={() => toggleProject(project.id)}
+            >
+              <span className="truncate">{project.code} - {project.name}</span>
+              <X size={14} aria-hidden="true" />
+              <span className="sr-only">Remover projeto</span>
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="max-h-56 overflow-y-auto rounded-xl border border-slate-700 bg-sidebar">
+        {filteredProjects.length === 0 ? (
+          <p className="px-3 py-4 text-sm text-slate-400">Nenhum projeto encontrado.</p>
+        ) : filteredProjects.map((project) => (
+          <label key={project.id} className="flex cursor-pointer items-start gap-3 border-b border-slate-700/60 px-3 py-3 last:border-0 hover:bg-white/[.03]">
+            <input
+              type="checkbox"
+              className="mt-1 h-4 w-4 rounded border-slate-600 bg-card accent-accent"
+              checked={selectedIds.includes(project.id)}
+              onChange={() => toggleProject(project.id)}
+            />
+            <span className="min-w-0">
+              <span className="block text-sm font-medium">{project.code} - {project.name}</span>
+              <span className="block text-xs text-slate-400">{project.status}</span>
+            </span>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function ClientForm({ client, onSave, onCancel }: { client?: Client; onSave: (input: Record<string, unknown>) => Promise<void>; onCancel: () => void }) {
   const [activeTab, setActiveTab] = useState<TabId>("identity");
   const { toast } = useToast();
@@ -371,11 +492,11 @@ export function ClientForm({ client, onSave, onCancel }: { client?: Client; onSa
   const cepLookup = useMutation({
     mutationFn: lookupCep,
     onSuccess: (data) => {
-      setValue("postalCode", maskCep(data.postalCode));
-      setValue("street", data.street);
-      setValue("district", data.district);
-      setValue("city", data.city);
-      setValue("state", data.state);
+      setValue("postalCode", maskCep(data.postalCode), { shouldValidate: true });
+      setValue("street", data.street, { shouldValidate: true });
+      setValue("district", data.district, { shouldValidate: true });
+      setValue("city", data.city, { shouldValidate: true });
+      setValue("state", data.state, { shouldValidate: true });
       toast("Endereco preenchido pelo CEP.");
     },
     onError: (error) => toast(error.message, "error")
@@ -384,20 +505,20 @@ export function ClientForm({ client, onSave, onCancel }: { client?: Client; onSa
   const cnpjLookup = useMutation({
     mutationFn: lookupCnpj,
     onSuccess: (data) => {
-      setValue("document", maskCnpj(data.document));
-      setValue("name", data.name || data.legalName);
-      setValue("legalName", data.legalName);
-      setValue("tradeName", data.name);
-      setValue("email", data.email);
-      setValue("phone", maskPhone(data.phone));
-      setValue("postalCode", maskCep(data.postalCode));
-      setValue("street", data.street);
-      setValue("number", data.number);
-      setValue("district", data.district);
-      setValue("city", data.city);
-      setValue("state", data.state);
-      setValue("segment", data.segment);
-      setValue("openingDate", data.openingDate);
+      setValue("document", maskCnpj(data.document), { shouldValidate: true });
+      setValue("name", data.name || data.legalName, { shouldValidate: true });
+      setValue("legalName", data.legalName, { shouldValidate: true });
+      setValue("tradeName", data.name, { shouldValidate: true });
+      setValue("email", data.email, { shouldValidate: true });
+      setValue("phone", maskPhone(data.phone), { shouldValidate: true });
+      setValue("postalCode", maskCep(data.postalCode), { shouldValidate: true });
+      setValue("street", data.street, { shouldValidate: true });
+      setValue("number", data.number, { shouldValidate: true });
+      setValue("district", data.district, { shouldValidate: true });
+      setValue("city", data.city, { shouldValidate: true });
+      setValue("state", data.state, { shouldValidate: true });
+      setValue("segment", data.segment, { shouldValidate: true });
+      setValue("openingDate", data.openingDate, { shouldValidate: true });
       toast("Empresa preenchida pelo CNPJ.");
     },
     onError: (error) => toast(error.message, "error")
@@ -406,6 +527,10 @@ export function ClientForm({ client, onSave, onCancel }: { client?: Client; onSa
   const submit = async (fields: Fields): Promise<void> => {
     await onSave({
       ...fields,
+      document: fields.document ? onlyDigits(fields.document) : null,
+      phone: fields.phone ? onlyDigits(fields.phone) : null,
+      whatsapp: fields.whatsapp ? onlyDigits(fields.whatsapp) : null,
+      postalCode: fields.postalCode ? onlyDigits(fields.postalCode) : null,
       birthDate: isCompany ? null : dateOrNull(fields.birthDate),
       openingDate: isCompany ? dateOrNull(fields.openingDate) : null,
       gender: isCompany ? null : fields.gender,
@@ -526,7 +651,10 @@ export function ClientForm({ client, onSave, onCancel }: { client?: Client; onSa
 
           {activeTab === "projects" && (
             <fieldset className="grid gap-4">
-              <label>Vincular a projetos<select multiple className="min-h-56 w-full rounded-xl border border-slate-700 bg-sidebar px-3 py-2 text-sm" {...register("projectIds")}>{projects.map((project) => <option key={project.id} value={project.id}>{project.code} - {project.name}</option>)}</select></label>
+              <div>
+                <span className="mb-2 block text-sm">Vincular a projetos</span>
+                <Controller control={control} name="projectIds" render={({ field }) => <ProjectSelector projects={projects} selectedIds={field.value} onChange={field.onChange} />} />
+              </div>
             </fieldset>
           )}
 
