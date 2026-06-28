@@ -2,11 +2,23 @@ import type { z } from "zod";
 import type { ClientStatus } from "@prisma/client";
 import { ClientRepository } from "../repositories/client.repository.js";
 import { AuditRepository } from "../repositories/audit.repository.js";
-import type { clientSchema } from "../validations/entities.validation.js";
+import { clientSchema } from "../validations/entities.validation.js";
 import type { ListQuery } from "../utils/pagination.js";
 import { ApiError } from "../utils/api-error.js";
 
 type ClientInput = z.infer<typeof clientSchema>;
+
+interface ClientImportRowError {
+  row: number;
+  name?: string;
+  message: string;
+}
+
+interface ClientImportResult {
+  created: number;
+  failed: number;
+  errors: ClientImportRowError[];
+}
 
 export class ClientService {
   public constructor(
@@ -35,6 +47,45 @@ export class ClientService {
     });
     await this.auditRepository.log({ userId, clientId: client.id, entity: "Client", entityId: client.id, action: "CREATED" });
     return client;
+  }
+
+  public async importMany(rows: unknown[], userId: string): Promise<ClientImportResult> {
+    const result: ClientImportResult = { created: 0, failed: 0, errors: [] };
+    const importedDocuments = new Set<string>();
+
+    for (const [index, row] of rows.entries()) {
+      const line = index + 2;
+      const parsed = clientSchema.safeParse(row);
+      if (!parsed.success) {
+        result.failed += 1;
+        result.errors.push({ row: line, message: parsed.error.issues.map((issue) => issue.message).join("; ") });
+        continue;
+      }
+
+      const document = parsed.data.document?.trim() ?? "";
+      if (document && importedDocuments.has(document)) {
+        result.failed += 1;
+        result.errors.push({ row: line, name: parsed.data.name, message: "Documento duplicado no arquivo." });
+        continue;
+      }
+
+      if (document && await this.repository.findByDocument(document)) {
+        result.failed += 1;
+        result.errors.push({ row: line, name: parsed.data.name, message: "Ja existe um cliente cadastrado com este documento." });
+        continue;
+      }
+
+      try {
+        await this.create(parsed.data, userId);
+        if (document) importedDocuments.add(document);
+        result.created += 1;
+      } catch (error) {
+        result.failed += 1;
+        result.errors.push({ row: line, name: parsed.data.name, message: error instanceof Error ? error.message : "Nao foi possivel importar o cliente." });
+      }
+    }
+
+    return result;
   }
 
   public async update(id: string, input: ClientInput, userId: string) {

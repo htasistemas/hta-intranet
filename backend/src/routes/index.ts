@@ -14,6 +14,7 @@ import { requireAuth } from "../middleware/auth.js";
 import { requireAdmin } from "../middleware/admin.js";
 import {
   categorySchema,
+  clientImportRequestSchema,
   clientSchema,
   crmActivitySchema,
   crmAutomationSchema,
@@ -29,6 +30,7 @@ import {
   communicationTemplateSchema,
   communicationWebhookSchema,
   crmGoalSchema,
+  crmLeadImportRequestSchema,
   crmSlaRuleSchema,
   noteSchema,
   clientProductSchema,
@@ -80,6 +82,7 @@ apiRouter.get("/lookup/cep/:cep", asyncHandler(utility.lookupCep));
 apiRouter.get("/lookup/cnpj/:cnpj", asyncHandler(utility.lookupCnpj));
 apiRouter.get("/clients", asyncHandler(clients.list));
 apiRouter.get("/clients/:id", asyncHandler(clients.get));
+apiRouter.post("/clients/import", validateBody(clientImportRequestSchema), asyncHandler(clients.import));
 apiRouter.post("/clients", validateBody(clientSchema), asyncHandler(clients.create));
 apiRouter.put("/clients/:id", validateBody(clientSchema), asyncHandler(clients.update));
 apiRouter.delete("/clients/:id", asyncHandler(clients.delete));
@@ -126,6 +129,9 @@ apiRouter.get("/reports/clients.pdf", asyncHandler(reports.clientsPdf));
 apiRouter.get("/crm/dashboard", asyncHandler(crm.dashboard));
 apiRouter.get("/crm/pipeline/insights", asyncHandler(crm.pipelineInsights));
 apiRouter.get("/crm/leads", asyncHandler(crm.listLeads));
+apiRouter.post("/crm/leads/import", validateBody(crmLeadImportRequestSchema), asyncHandler(crm.importLeads));
+apiRouter.get("/crm/leads/cities", asyncHandler(crm.leadCities));
+apiRouter.get("/crm/leads/stats", asyncHandler(crm.leadStats));
 apiRouter.get("/crm/leads/:id/intelligence", asyncHandler(crm.leadIntelligence));
 apiRouter.get("/crm/leads/:id", asyncHandler(crm.getLead));
 apiRouter.post("/crm/leads", validateBody(crmLeadSchema), asyncHandler(crm.createLead));

@@ -1,4 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import type { ReactNode } from "react";
 import { Controller, useForm, type Path, type UseFormRegister } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -127,6 +128,18 @@ function SelectField({ label, name, register, options }: { label: string; name: 
   );
 }
 
+function FormSection({ title, description, children }: { title: string; description: string; children: ReactNode }) {
+  return (
+    <section className="rounded-2xl border border-slate-700/70 bg-sidebar/60 p-4">
+      <div className="mb-4 flex flex-col gap-1 border-b border-slate-700/60 pb-3">
+        <h3 className="text-sm font-semibold text-slate-100">{title}</h3>
+        <p className="text-xs text-slate-500">{description}</p>
+      </div>
+      {children}
+    </section>
+  );
+}
+
 export function LeadForm({ lead, onCancel, onSave }: { lead?: CrmLead; onCancel: () => void; onSave: (input: LeadFormInput) => Promise<void> }) {
   const { register, control, handleSubmit, formState: { errors, isSubmitting } } = useForm<LeadFormValues, unknown, LeadFormInput>({
     resolver: zodResolver(leadFormSchema),
@@ -164,36 +177,74 @@ export function LeadForm({ lead, onCancel, onSave }: { lead?: CrmLead; onCancel:
   });
   return (
     <form className="space-y-5" onSubmit={(event) => void handleSubmit(onSave)(event)}>
-      <section className="grid gap-3 md:grid-cols-3">
-        <label className="space-y-1 text-sm text-slate-300"><span>Nome</span><Input {...register("name")} /><FieldError message={errors.name?.message} /></label>
-        <label className="space-y-1 text-sm text-slate-300"><span>Empresa</span><Input {...register("company")} /></label>
-        <label className="space-y-1 text-sm text-slate-300"><span>CNPJ</span><Input {...register("document")} /></label>
-        <label className="space-y-1 text-sm text-slate-300"><span>Segmento</span><Input {...register("segment")} /></label>
-        <label className="space-y-1 text-sm text-slate-300"><span>Cargo</span><Input {...register("position")} /></label>
-        <label className="space-y-1 text-sm text-slate-300"><span>E-mail</span><Input {...register("email")} /><FieldError message={errors.email?.message} /></label>
-        <label className="space-y-1 text-sm text-slate-300"><span>Telefone</span><Input {...register("phone")} /></label>
-        <label className="space-y-1 text-sm text-slate-300"><span>WhatsApp</span><Input {...register("whatsapp")} /></label>
-        <label className="space-y-1 text-sm text-slate-300"><span>Site</span><Input {...register("site")} /></label>
-        <label className="space-y-1 text-sm text-slate-300"><span>CEP</span><Input {...register("postalCode")} /></label>
-        <label className="space-y-1 text-sm text-slate-300"><span>Logradouro</span><Input {...register("street")} /></label>
-        <label className="space-y-1 text-sm text-slate-300"><span>Numero</span><Input {...register("number")} /></label>
-        <label className="space-y-1 text-sm text-slate-300"><span>Bairro</span><Input {...register("district")} /></label>
-        <label className="space-y-1 text-sm text-slate-300"><span>Cidade</span><Input {...register("city")} /></label>
-        <label className="space-y-1 text-sm text-slate-300"><span>Estado</span><Input {...register("state")} /></label>
-      </section>
-      <section className="grid gap-3 md:grid-cols-3">
-        <label className="space-y-1 text-sm text-slate-300"><span>Origem</span><Input {...register("source")} /></label>
-        <label className="space-y-1 text-sm text-slate-300"><span>Campanha</span><Input {...register("campaign")} /></label>
-        <label className="space-y-1 text-sm text-slate-300"><span>Responsavel</span><Input {...register("responsible")} /><FieldError message={errors.responsible?.message} /></label>
-        <label className="space-y-1 text-sm text-slate-300"><span>Interesse</span><Input {...register("interest")} /></label>
-        <label className="space-y-1 text-sm text-slate-300"><span>Produto</span><Input {...register("productInterest")} /></label>
-        <Controller control={control} name="estimatedValue" render={({ field }) => <label className="space-y-1 text-sm text-slate-300"><span>Valor estimado</span><CurrencyInput value={String(field.value ?? "")} onChange={field.onChange} /></label>} />
-        <SelectField label="Score" name="score" register={register} options={[{ value: "VERY_HOT", label: "Muito Quente" }, { value: "HOT", label: "Quente" }, { value: "WARM", label: "Morno" }, { value: "COLD", label: "Frio" }]} />
-        <SelectField label="Prioridade" name="priority" register={register} options={[{ value: "LOW", label: "Baixa" }, { value: "MEDIUM", label: "Media" }, { value: "HIGH", label: "Alta" }, { value: "URGENT", label: "Urgente" }]} />
-        <SelectField label="Status" name="status" register={register} options={[{ value: "NEW", label: "Novo" }, { value: "IN_SERVICE", label: "Em Atendimento" }, { value: "QUALIFIED", label: "Qualificado" }, { value: "PROPOSAL_SENT", label: "Proposta Enviada" }, { value: "NEGOTIATION", label: "Negociacao" }, { value: "WON", label: "Fechado Ganho" }, { value: "LOST", label: "Fechado Perdido" }]} />
-      </section>
-      <label className="block space-y-1 text-sm text-slate-300"><span>Observacoes</span><Textarea {...register("observations")} /></label>
-      <div className="flex justify-end gap-2"><Button type="button" variant="ghost" onClick={onCancel}>Cancelar</Button><Button disabled={isSubmitting}>{isSubmitting ? "Salvando..." : "Salvar lead"}</Button></div>
+      <header className="rounded-2xl border border-slate-700 bg-card p-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs uppercase text-slate-500">{lead ? "Edicao de captacao" : "Nova captacao"}</p>
+            <h2 className="mt-1 truncate text-xl font-semibold">{lead?.name ?? "Possivel cliente"}</h2>
+            <p className="mt-1 text-sm text-slate-400">{lead?.company ?? "Cadastro comercial para prospeccao"}</p>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[520px]">
+            <SelectField label="Status" name="status" register={register} options={[{ value: "NEW", label: "Novo" }, { value: "IN_SERVICE", label: "Em Atendimento" }, { value: "QUALIFIED", label: "Qualificado" }, { value: "PROPOSAL_SENT", label: "Proposta Enviada" }, { value: "NEGOTIATION", label: "Negociacao" }, { value: "WON", label: "Fechado Ganho" }, { value: "LOST", label: "Fechado Perdido" }]} />
+            <SelectField label="Temperatura" name="score" register={register} options={[{ value: "VERY_HOT", label: "Muito Quente" }, { value: "HOT", label: "Quente" }, { value: "WARM", label: "Morno" }, { value: "COLD", label: "Frio" }]} />
+            <SelectField label="Prioridade" name="priority" register={register} options={[{ value: "LOW", label: "Baixa" }, { value: "MEDIUM", label: "Media" }, { value: "HIGH", label: "Alta" }, { value: "URGENT", label: "Urgente" }]} />
+          </div>
+        </div>
+      </header>
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,.9fr)]">
+        <div className="space-y-5">
+          <FormSection title="Identificacao da instituicao" description="Dados principais usados para reconhecer e localizar a oportunidade.">
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="space-y-1 text-sm text-slate-300"><span>Nome fantasia / Sigla</span><Input placeholder="Ex: AMPLIT" {...register("name")} /><FieldError message={errors.name?.message} /></label>
+              <label className="space-y-1 text-sm text-slate-300"><span>Razao social</span><Input placeholder="Nome juridico da instituicao" {...register("company")} /></label>
+              <label className="space-y-1 text-sm text-slate-300"><span>CNPJ</span><Input placeholder="00.000.000/0000-00" {...register("document")} /></label>
+              <label className="space-y-1 text-sm text-slate-300"><span>Segmento / Area principal</span><Input placeholder="Assistencia social, educacao..." {...register("segment")} /></label>
+            </div>
+          </FormSection>
+
+          <FormSection title="Contato e localizacao" description="Canais de abordagem e endereco operacional.">
+            <div className="grid gap-3 md:grid-cols-3">
+              <label className="space-y-1 text-sm text-slate-300"><span>E-mail</span><Input type="email" placeholder="contato@instituicao.org.br" {...register("email")} /><FieldError message={errors.email?.message} /></label>
+              <label className="space-y-1 text-sm text-slate-300"><span>Telefone</span><Input placeholder="(00) 0000-0000" {...register("phone")} /></label>
+              <label className="space-y-1 text-sm text-slate-300"><span>WhatsApp</span><Input placeholder="(00) 00000-0000" {...register("whatsapp")} /></label>
+              <label className="space-y-1 text-sm text-slate-300 md:col-span-2"><span>Site / Instagram</span><Input placeholder="https://..." {...register("site")} /></label>
+              <label className="space-y-1 text-sm text-slate-300"><span>CEP</span><Input {...register("postalCode")} /></label>
+              <label className="space-y-1 text-sm text-slate-300 md:col-span-2"><span>Endereco completo</span><Input {...register("street")} /></label>
+              <label className="space-y-1 text-sm text-slate-300"><span>Numero</span><Input {...register("number")} /></label>
+              <label className="space-y-1 text-sm text-slate-300"><span>Bairro</span><Input {...register("district")} /></label>
+              <label className="space-y-1 text-sm text-slate-300"><span>Cidade</span><Input {...register("city")} /></label>
+              <label className="space-y-1 text-sm text-slate-300"><span>UF</span><Input maxLength={2} {...register("state")} /></label>
+            </div>
+          </FormSection>
+        </div>
+
+        <div className="space-y-5">
+          <FormSection title="Qualificacao comercial" description="Classificacao para priorizar abordagem e conversao.">
+            <div className="grid gap-3">
+              <label className="space-y-1 text-sm text-slate-300"><span>Responsavel interno</span><Input placeholder="Consultor responsavel" {...register("responsible")} /><FieldError message={errors.responsible?.message} /></label>
+              <label className="space-y-1 text-sm text-slate-300"><span>Origem</span><Input placeholder="Mapa OSC, evento, indicacao..." {...register("source")} /></label>
+              <label className="space-y-1 text-sm text-slate-300"><span>Campanha</span><Input placeholder="OSC MG 2026" {...register("campaign")} /></label>
+              <label className="space-y-1 text-sm text-slate-300"><span>Contato decisor / Cargo</span><Input placeholder="Presidente, diretor, coordenador..." {...register("position")} /></label>
+              <label className="space-y-1 text-sm text-slate-300"><span>Dor / Interesse</span><Input placeholder="Gestao, captacao, portal, atendimento..." {...register("interest")} /></label>
+              <label className="space-y-1 text-sm text-slate-300"><span>Produto de interesse</span><Input placeholder="Sistema, consultoria, projeto..." {...register("productInterest")} /></label>
+              <Controller control={control} name="estimatedValue" render={({ field }) => <label className="space-y-1 text-sm text-slate-300"><span>Valor estimado</span><CurrencyInput value={String(field.value ?? "")} onChange={field.onChange} /></label>} />
+            </div>
+          </FormSection>
+
+          <FormSection title="Historico e observacoes" description="Contexto importado da base e anotacoes do atendimento.">
+            <label className="block space-y-1 text-sm text-slate-300"><span>Observacoes</span><Textarea className="min-h-48" {...register("observations")} /></label>
+          </FormSection>
+        </div>
+      </div>
+
+      <div className="sticky bottom-0 z-10 flex flex-col gap-3 border-t border-slate-700 bg-card/95 pt-4 backdrop-blur sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-slate-400">{lead ? "Atualize os dados e salve a captacao." : "Preencha os dados principais para criar a captacao."}</p>
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="ghost" onClick={onCancel}>Cancelar</Button>
+          <Button disabled={isSubmitting}>{isSubmitting ? "Salvando..." : "Salvar captacao"}</Button>
+        </div>
+      </div>
     </form>
   );
 }

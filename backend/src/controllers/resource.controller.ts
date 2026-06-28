@@ -30,6 +30,9 @@ export class ClientController {
   public create = async (request: Request, response: Response): Promise<void> => {
     response.status(201).json(await this.service.create(request.body, userId(request)));
   };
+  public import = async (request: Request, response: Response): Promise<void> => {
+    response.status(201).json(await this.service.importMany(request.body.rows, userId(request)));
+  };
   public update = async (request: Request, response: Response): Promise<void> => {
     response.json(await this.service.update(resourceId(request), request.body, userId(request)));
   };

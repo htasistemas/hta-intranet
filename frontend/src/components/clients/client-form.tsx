@@ -86,7 +86,7 @@ const defaults: Fields = {
   city: "",
   state: "",
   observations: "",
-  status: "PROSPECT",
+  status: "ACTIVE",
   source: "",
   segment: "",
   companySize: "",

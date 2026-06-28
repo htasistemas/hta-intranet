@@ -18,6 +18,7 @@ import {
   Search,
   Settings,
   Sparkles,
+  Target,
   UserCog,
   X,
   type LucideIcon
@@ -47,7 +48,8 @@ const navigation: NavigationGroup[] = [
       { label: "Gestao Pessoal", href: "/tarefas", icon: ClipboardList },
       { label: "CRM Comercial", href: "/crm-comercial", icon: Handshake },
       { label: "Portal Cliente", href: "/portal-cliente", icon: PanelsTopLeft },
-      { label: "Clientes", href: "/clientes", icon: ContactRound },
+      { label: "Clientes ativos", href: "/clientes", icon: ContactRound },
+      { label: "Captacao", href: "/captacao", icon: Target },
       { label: "Produtos", href: "/produtos", icon: Package },
       { label: "Projetos", href: "/projetos", icon: FolderKanban }
     ]

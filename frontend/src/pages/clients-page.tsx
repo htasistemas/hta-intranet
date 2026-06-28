@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, Edit3, Plus, Search, Trash2 } from "lucide-react";
+import { Download, Edit3, Plus, Search, Trash2, Upload } from "lucide-react";
 import { api } from "@/services/api";
-import type { Client, PageResult } from "@/types";
+import type { Client, ClientImportResult, PageResult } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -10,6 +10,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ClientForm } from "@/components/clients/client-form";
+import { ClientImportDialog } from "@/components/clients/client-import-dialog";
 import { useToast } from "@/contexts/toast-context";
 import { currency } from "@/lib/utils";
 
@@ -18,9 +19,10 @@ export default function ClientsPage() {
   const [selected, setSelected] = useState<Client | undefined>();
   const [clientToDelete, setClientToDelete] = useState<Client | undefined>();
   const [opened, setOpened] = useState(false);
+  const [importOpened, setImportOpened] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { data, isLoading } = useQuery({ queryKey: ["clients", search], queryFn: () => api.get<PageResult<Client>>(`/clients?pageSize=30&search=${encodeURIComponent(search)}`) });
+  const { data, isLoading } = useQuery({ queryKey: ["clients", "active", search], queryFn: () => api.get<PageResult<Client>>(`/clients?pageSize=30&status=ACTIVE&search=${encodeURIComponent(search)}`) });
   const save = useMutation({
     mutationFn: (input: Record<string, unknown>) => selected ? api.put<Client>(`/clients/${selected.id}`, input) : api.post<Client>("/clients", input),
     onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["clients"] }); setOpened(false); toast("Cliente salvo com sucesso."); },
@@ -35,11 +37,17 @@ export default function ClientsPage() {
     try { await api.download(`/reports/clients.${type}`, `clientes.${type}`); toast("Relatorio exportado."); }
     catch (error) { toast(error instanceof Error ? error.message : "Falha na exportacao.", "error"); }
   };
+  const handleImported = (result: ClientImportResult) => {
+    void queryClient.invalidateQueries({ queryKey: ["clients"] });
+    const message = result.failed ? `${result.created} cliente(s) importado(s). ${result.failed} linha(s) com erro.` : `${result.created} cliente(s) importado(s) com sucesso.`;
+    toast(message, result.failed ? "error" : "success");
+  };
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row">
-        <label className="relative flex-1"><Search className="absolute left-3 top-3 text-slate-500" size={18} /><Input className="pl-10" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar cliente, documento ou email" /></label>
+        <label className="relative flex-1"><Search className="absolute left-3 top-3 text-slate-500" size={18} /><Input className="pl-10" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar cliente ativo, documento ou email" /></label>
         <Button variant="outline" onClick={() => void exportReport("csv")}><Download size={17} /> Excel</Button>
+        <Button variant="outline" onClick={() => setImportOpened(true)}><Upload size={17} /> Importar</Button>
         <Button onClick={() => { setSelected(undefined); setOpened(true); }}><Plus size={17} /> Novo cliente</Button>
       </div>
       <Card className="overflow-x-auto p-0">
@@ -66,6 +74,7 @@ export default function ClientsPage() {
       <Dialog open={opened} title={selected ? "Editar cliente" : "Novo cliente"} onClose={() => setOpened(false)}>
         <ClientForm client={selected} onCancel={() => setOpened(false)} onSave={(input) => save.mutateAsync(input).then(() => undefined)} />
       </Dialog>
+      <ClientImportDialog open={importOpened} onClose={() => setImportOpened(false)} onImported={handleImported} />
       <ConfirmDialog
         open={Boolean(clientToDelete)}
         title="Excluir cliente"

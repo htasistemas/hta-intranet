@@ -8,6 +8,7 @@ const LoginPage = lazy(() => import("@/pages/login-page"));
 const DashboardPage = lazy(() => import("@/pages/dashboard-page"));
 const CrmPage = lazy(() => import("@/pages/crm-page"));
 const ClientsPage = lazy(() => import("@/pages/clients-page"));
+const ProspectingPage = lazy(() => import("@/pages/prospecting-page"));
 const CustomerPortalPage = lazy(() => import("@/pages/customer-portal-page"));
 const ProductsPage = lazy(() => import("@/pages/products-page"));
 const ProjectsPage = lazy(() => import("@/pages/projects-page"));
@@ -30,6 +31,7 @@ export default function App() {
           <Route path="/" element={<DashboardPage />} />
           <Route path="/crm-comercial" element={<CrmPage />} />
           <Route path="/clientes" element={<ClientsPage />} />
+          <Route path="/captacao" element={<ProspectingPage />} />
           <Route path="/portal-cliente" element={<CustomerPortalPage />} />
           <Route path="/produtos" element={<ProductsPage />} />
           <Route path="/projetos" element={<ProjectsPage />} />

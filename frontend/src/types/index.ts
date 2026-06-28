@@ -186,3 +186,15 @@ export interface PageResult<T> {
   page: number;
   pageSize: number;
 }
+
+export interface ClientImportError {
+  row: number;
+  name?: string;
+  message: string;
+}
+
+export interface ClientImportResult {
+  created: number;
+  failed: number;
+  errors: ClientImportError[];
+}

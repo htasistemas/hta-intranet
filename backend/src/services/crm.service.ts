@@ -12,11 +12,11 @@ import type {
   crmActivitySchema,
   crmAutomationSchema,
   crmContractSchema,
-  crmLeadSchema,
   crmProjectSchema,
   crmProjectTaskSchema,
   crmProposalSchema
 } from "../validations/entities.validation.js";
+import { crmLeadSchema } from "../validations/entities.validation.js";
 import type { ListQuery } from "../utils/pagination.js";
 import { ApiError } from "../utils/api-error.js";
 import { prisma } from "../prisma/client.js";
@@ -28,6 +28,18 @@ type ContractInput = z.infer<typeof crmContractSchema>;
 type ProjectInput = z.infer<typeof crmProjectSchema>;
 type ProjectTaskInput = z.infer<typeof crmProjectTaskSchema>;
 type AutomationInput = z.infer<typeof crmAutomationSchema>;
+
+interface CrmLeadImportRowError {
+  row: number;
+  name?: string;
+  message: string;
+}
+
+interface CrmLeadImportResult {
+  created: number;
+  failed: number;
+  errors: CrmLeadImportRowError[];
+}
 
 const stageStatusMap: Record<CrmPipelineStage, CrmLeadStatus> = {
   LEAD_RECEIVED: "NEW",
@@ -137,6 +149,27 @@ export class CrmService {
     return this.repository.listLeads(scope(ownerId), query, filters);
   }
 
+  public async leadCities(ownerId: string): Promise<Array<{ city: string; state: string; total: number }>> {
+    const cities = await prisma.crmLead.groupBy({
+      by: ["city", "state"],
+      where: { ...scope(ownerId), deletedAt: null, city: { not: null } },
+      _count: { _all: true },
+      orderBy: { _count: { city: "desc" } }
+    });
+    return cities.map((city) => ({ city: city.city ?? "Nao informada", state: city.state ?? "", total: city._count._all }));
+  }
+
+  public async leadStats(ownerId: string): Promise<{ total: number; open: number; qualified: number; estimatedTotal: number }> {
+    const currentScope = scope(ownerId);
+    const [total, open, qualified, aggregate] = await prisma.$transaction([
+      prisma.crmLead.count({ where: { ...currentScope, deletedAt: null } }),
+      prisma.crmLead.count({ where: { ...currentScope, deletedAt: null, status: { notIn: ["WON", "LOST"] } } }),
+      prisma.crmLead.count({ where: { ...currentScope, deletedAt: null, status: { in: ["QUALIFIED", "PROPOSAL_SENT", "NEGOTIATION"] } } }),
+      prisma.crmLead.aggregate({ where: { ...currentScope, deletedAt: null, status: { notIn: ["WON", "LOST"] } }, _sum: { estimatedValue: true } })
+    ]);
+    return { total, open, qualified, estimatedTotal: Number(aggregate._sum.estimatedValue ?? 0) };
+  }
+
   public async getLead(id: string, ownerId: string) {
     const lead = await this.repository.findLead(id, scope(ownerId));
     if (!lead) throw new ApiError(404, "Lead nao encontrado.");
@@ -162,6 +195,38 @@ export class CrmService {
       completedAt: new Date()
     });
     return lead;
+  }
+
+  public async importLeads(ownerId: string, rows: unknown[]): Promise<CrmLeadImportResult> {
+    const result: CrmLeadImportResult = { created: 0, failed: 0, errors: [] };
+    const currentScope = scope(ownerId);
+    const validRows: LeadInput[] = [];
+
+    for (const [index, row] of rows.entries()) {
+      const line = index + 2;
+      const parsed = crmLeadSchema.safeParse(row);
+      if (!parsed.success) {
+        result.failed += 1;
+        result.errors.push({ row: line, message: parsed.error.issues.map((issue) => issue.message).join("; ") });
+        continue;
+      }
+      validRows.push(parsed.data);
+    }
+
+    for (let index = 0; index < validRows.length; index += 1000) {
+      const chunk = validRows.slice(index, index + 1000);
+      const created = await prisma.crmLead.createMany({
+        data: chunk.map((lead) => ({
+          ...lead,
+          email: normalizeEmail(lead.email),
+          tenantId: currentScope.tenantId,
+          ownerId
+        }))
+      });
+      result.created += created.count;
+    }
+
+    return result;
   }
 
   public async updateLead(id: string, ownerId: string, input: LeadInput) {

@@ -52,6 +52,14 @@ export const clientSchema = z.object({
   projectIds: z.array(z.string()).default([])
 });
 
+export const clientImportRequestSchema = z.object({
+  rows: z.array(z.unknown()).min(1).max(1000)
+});
+
+export const crmLeadImportRequestSchema = z.object({
+  rows: z.array(z.unknown()).min(1).max(1000)
+});
+
 export const scheduleSchema = z.object({
   clientId: optionalText,
   projectId: optionalText,

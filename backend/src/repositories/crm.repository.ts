@@ -56,7 +56,9 @@ export class CrmRepository {
           { name: { contains: query.search, mode: "insensitive" } },
           { company: { contains: query.search, mode: "insensitive" } },
           { document: { contains: query.search } },
-          { email: { contains: query.search, mode: "insensitive" } }
+          { email: { contains: query.search, mode: "insensitive" } },
+          { city: { contains: query.search, mode: "insensitive" } },
+          { state: { contains: query.search, mode: "insensitive" } }
         ]
       } : {})
     };

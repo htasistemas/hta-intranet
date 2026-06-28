@@ -40,6 +40,10 @@ export class ClientRepository {
     });
   }
 
+  public findByDocument(document: string) {
+    return prisma.client.findUnique({ where: { document } });
+  }
+
   public create(data: Prisma.ClientCreateInput) {
     return prisma.client.create({ data, include: includeRelations });
   }

@@ -75,12 +75,24 @@ export class CrmController {
     response.json({ ...result, page: query.page, pageSize: query.pageSize });
   };
 
+  public leadCities = async (request: Request, response: Response): Promise<void> => {
+    response.json(await this.service.leadCities(userId(request)));
+  };
+
+  public leadStats = async (request: Request, response: Response): Promise<void> => {
+    response.json(await this.service.leadStats(userId(request)));
+  };
+
   public getLead = async (request: Request, response: Response): Promise<void> => {
     response.json(await this.service.getLead(resourceId(request), userId(request)));
   };
 
   public createLead = async (request: Request, response: Response): Promise<void> => {
     response.status(201).json(await this.service.createLead(userId(request), request.body));
+  };
+
+  public importLeads = async (request: Request, response: Response): Promise<void> => {
+    response.status(201).json(await this.service.importLeads(userId(request), request.body.rows));
   };
 
   public updateLead = async (request: Request, response: Response): Promise<void> => {

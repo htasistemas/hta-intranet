@@ -288,3 +288,28 @@ export interface CrmClientIntelligence {
   lastActivityAt: string | null;
   lastMessageAt: string | null;
 }
+
+export interface CrmLeadImportError {
+  row: number;
+  name?: string;
+  message: string;
+}
+
+export interface CrmLeadImportResult {
+  created: number;
+  failed: number;
+  errors: CrmLeadImportError[];
+}
+
+export interface CrmLeadCityStat {
+  city: string;
+  state: string;
+  total: number;
+}
+
+export interface CrmLeadStats {
+  total: number;
+  open: number;
+  qualified: number;
+  estimatedTotal: number;
+}
