@@ -8,6 +8,7 @@ import {
   ChevronRight,
   ClipboardList,
   ContactRound,
+  DatabaseBackup,
   Handshake,
   PanelsTopLeft,
   FileBarChart,
@@ -59,6 +60,7 @@ const navigation: NavigationGroup[] = [
     items: [
       { label: "Relatorios", href: "/relatorios", icon: FileBarChart },
       { label: "Usuarios", href: "/usuarios", icon: UserCog },
+      { label: "Backup e restauracao", href: "/backup-restauracao", icon: DatabaseBackup },
       { label: "Configuracoes", href: "/configuracoes", icon: Settings }
     ]
   }

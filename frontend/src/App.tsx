@@ -18,6 +18,7 @@ const CalculatorPage = lazy(() => import("@/pages/calculator-page"));
 const ReportsPage = lazy(() => import("@/pages/reports-page"));
 const SettingsPage = lazy(() => import("@/pages/settings-page"));
 const UsersPage = lazy(() => import("@/pages/users-page"));
+const BackupRestorePage = lazy(() => import("@/pages/backup-restore-page"));
 
 function Loading() { return <div className="p-8"><Skeleton className="h-80" /></div>; }
 
@@ -40,6 +41,10 @@ export default function App() {
           <Route path="/calculadora" element={<CalculatorPage />} />
           <Route path="/relatorios" element={<ReportsPage />} />
           <Route path="/usuarios" element={<UsersPage />} />
+          <Route path="/backup" element={<Navigate to="/backup-restauracao" replace />} />
+          <Route path="/backups" element={<Navigate to="/backup-restauracao" replace />} />
+          <Route path="/backup-e-restauracao" element={<Navigate to="/backup-restauracao" replace />} />
+          <Route path="/backup-restauracao" element={<BackupRestorePage />} />
           <Route path="/configuracoes" element={<SettingsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
