@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -20,6 +20,13 @@ interface BackupEnvironmentConfig {
 interface CommandResult {
   stdout: string;
   stderr: string;
+}
+
+export type RestoreProgressType = "info" | "error" | "success";
+
+export interface RestoreProgressEvent {
+  type: RestoreProgressType;
+  message: string;
 }
 
 export interface BackupFileResult {
@@ -52,6 +59,11 @@ function postgresToolDatabaseUrl(): string {
   return databaseUrl.toString();
 }
 
+function postgresTargetLabel(): string {
+  const databaseUrl = new URL(env.DATABASE_URL);
+  return `${databaseUrl.hostname}:${databaseUrl.port || "5432"}${databaseUrl.pathname}`;
+}
+
 async function runCommand(command: string, args: string[], cwd: string, env: NodeJS.ProcessEnv = {}): Promise<CommandResult> {
   try {
     return await execFileAsync(command, args, {
@@ -63,6 +75,40 @@ async function runCommand(command: string, args: string[], cwd: string, env: Nod
   } catch (error) {
     throw new ApiError(500, commandErrorMessage(error));
   }
+}
+
+async function runCommandWithProgress(
+  command: string,
+  args: string[],
+  cwd: string,
+  onProgress: (event: RestoreProgressEvent) => void,
+  env: NodeJS.ProcessEnv = {}
+): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(command, args, {
+      cwd,
+      env: { ...process.env, ...env },
+      windowsHide: true
+    });
+
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+
+    child.stdout.on("data", (chunk: string) => {
+      chunk.split(/\r?\n/).filter(Boolean).forEach((message) => onProgress({ type: "info", message }));
+    });
+    child.stderr.on("data", (chunk: string) => {
+      chunk.split(/\r?\n/).filter(Boolean).forEach((message) => onProgress({ type: "info", message }));
+    });
+    child.on("error", (error) => reject(new ApiError(500, error.message)));
+    child.on("close", (code) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+      reject(new ApiError(500, `Restauracao finalizada com erro. Codigo de saida: ${code ?? "desconhecido"}.`));
+    });
+  });
 }
 
 async function commandAvailable(command: string): Promise<boolean> {
@@ -134,6 +180,15 @@ export class BackupService {
   }
 
   public async restoreBackup(environment: BackupEnvironment, fileName: string, file: Buffer): Promise<void> {
+    await this.restoreBackupWithProgress(environment, fileName, file, () => undefined);
+  }
+
+  public async restoreBackupWithProgress(
+    environment: BackupEnvironment,
+    fileName: string,
+    file: Buffer,
+    onProgress: (event: RestoreProgressEvent) => void
+  ): Promise<void> {
     if (!file.length) throw new ApiError(422, "Arquivo de backup vazio.");
     if (!fileName.endsWith(".dump")) throw new ApiError(422, "Envie um arquivo .dump.");
 
@@ -144,13 +199,23 @@ export class BackupService {
     const backupPath = path.join(tempDir, safeFileName);
 
     try {
+      onProgress({ type: "info", message: "Arquivo recebido. Preparando restauracao..." });
       await writeFile(backupPath, file);
       if (!(await commandAvailable("docker"))) {
         const pgRestore = await resolvePgTool("pg_restore");
-        await runCommand(pgRestore, ["-d", postgresToolDatabaseUrl(), "--clean", "--if-exists", "--no-owner", "--no-privileges", backupPath], root);
+        onProgress({ type: "info", message: "Docker nao encontrado. Usando pg_restore local." });
+        onProgress({ type: "info", message: `Banco de destino: ${postgresTargetLabel()}` });
+        await runCommandWithProgress(
+          pgRestore,
+          ["-d", postgresToolDatabaseUrl(), "--clean", "--if-exists", "--no-owner", "--no-privileges", "--verbose", "--exit-on-error", "--single-transaction", backupPath],
+          root,
+          onProgress
+        );
+        onProgress({ type: "success", message: "Restauracao concluida com sucesso." });
         return;
       }
 
+      onProgress({ type: "info", message: "Docker encontrado. Executando rotina de restauracao no container." });
       if (process.platform === "win32") {
         const args = [
           "-ExecutionPolicy",
@@ -164,15 +229,22 @@ export class BackupService {
         ];
         if (config.envFile) args.push("-EnvFile", config.envFile);
         args.push("-Service", "postgres", "-Yes");
-        await runCommand("powershell.exe", args, root);
+        await runCommandWithProgress("powershell.exe", args, root, onProgress);
       } else {
-        await runCommand("sh", [path.join(root, "scripts", "db-restore.sh"), backupPath], root, {
-          COMPOSE_FILE: config.composeFile,
-          ENV_FILE: config.envFile ?? "",
-          SERVICE: "postgres",
-          YES: "1"
-        });
+        await runCommandWithProgress(
+          "sh",
+          [path.join(root, "scripts", "db-restore.sh"), backupPath],
+          root,
+          onProgress,
+          {
+            COMPOSE_FILE: config.composeFile,
+            ENV_FILE: config.envFile ?? "",
+            SERVICE: "postgres",
+            YES: "1"
+          }
+        );
       }
+      onProgress({ type: "success", message: "Restauracao concluida com sucesso." });
     } finally {
       await rm(tempDir, { recursive: true, force: true });
     }

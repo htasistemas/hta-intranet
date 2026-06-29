@@ -33,7 +33,21 @@ export class BackupController {
     if (!Buffer.isBuffer(request.body)) throw new ApiError(422, "Envie o arquivo .dump em application/octet-stream.");
     const { environment } = restoreQuerySchema.parse(request.query);
     const headers = restoreHeadersSchema.parse(request.headers);
-    await this.service.restoreBackup(environment, headers["x-backup-filename"], request.body);
-    response.json({ message: "Backup restaurado com sucesso." });
+    response.setHeader("Content-Type", "application/x-ndjson; charset=utf-8");
+    response.setHeader("Cache-Control", "no-cache");
+    response.flushHeaders();
+
+    const send = (event: { type: "info" | "error" | "success"; message: string }) => {
+      response.write(`${JSON.stringify(event)}\n`);
+    };
+
+    try {
+      await this.service.restoreBackupWithProgress(environment, headers["x-backup-filename"], request.body, send);
+      response.end();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Falha ao restaurar backup.";
+      send({ type: "error", message });
+      response.end();
+    }
   };
 }

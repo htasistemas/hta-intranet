@@ -29,6 +29,12 @@ const restoreFormSchema = z.object({
 type EnvironmentValue = (typeof environmentOptions)[number]["value"];
 type BackupForm = z.input<typeof backupFormSchema>;
 type RestoreForm = z.input<typeof restoreFormSchema>;
+type RestoreProgressType = "info" | "error" | "success";
+
+interface RestoreProgressEvent {
+  type: RestoreProgressType;
+  message: string;
+}
 
 interface EnvironmentSelectorProps {
   value: EnvironmentValue;
@@ -36,7 +42,7 @@ interface EnvironmentSelectorProps {
   tone?: "default" | "danger";
 }
 
-async function restoreBackup(environment: EnvironmentValue, file: File): Promise<void> {
+async function restoreBackup(environment: EnvironmentValue, file: File, onProgress: (event: RestoreProgressEvent) => void): Promise<void> {
   const response = await authenticatedFetch(`/backups/restore?environment=${environment}`, {
     method: "POST",
     headers: {
@@ -51,6 +57,36 @@ async function restoreBackup(environment: EnvironmentValue, file: File): Promise
     const result = await response.json().catch(() => ({ message: "Nao foi possivel restaurar o backup." })) as { message?: string };
     throw new Error(result.message ?? "Nao foi possivel restaurar o backup.");
   }
+
+  if (!response.body) throw new Error("Nao foi possivel acompanhar a restauracao.");
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let errorMessage = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const event = JSON.parse(line) as RestoreProgressEvent;
+      onProgress(event);
+      if (event.type === "error") errorMessage = event.message;
+    }
+  }
+
+  if (buffer.trim()) {
+    const event = JSON.parse(buffer) as RestoreProgressEvent;
+    onProgress(event);
+    if (event.type === "error") errorMessage = event.message;
+  }
+
+  if (errorMessage) throw new Error(errorMessage);
 }
 
 function EnvironmentSelector({ value, onChange, tone = "default" }: EnvironmentSelectorProps) {
@@ -84,6 +120,7 @@ export default function BackupRestorePage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [restoreProgress, setRestoreProgress] = useState<RestoreProgressEvent[]>([]);
 
   const backupForm = useForm<BackupForm>({
     resolver: zodResolver(backupFormSchema),
@@ -109,7 +146,10 @@ export default function BackupRestorePage() {
     mutationFn: async () => {
       if (!selectedFile) throw new Error("Selecione um arquivo .dump.");
       const values = restoreFormSchema.parse(restoreForm.getValues());
-      await restoreBackup(values.environment, selectedFile);
+      setRestoreProgress([{ type: "info", message: "Enviando arquivo para o servidor..." }]);
+      await restoreBackup(values.environment, selectedFile, (event) => {
+        setRestoreProgress((current) => [...current, event].slice(-80));
+      });
     },
     onSuccess: () => {
       toast("Backup restaurado com sucesso.");
@@ -130,6 +170,7 @@ export default function BackupRestorePage() {
       return;
     }
     setSelectedFile(file);
+    setRestoreProgress([]);
   }
 
   function openRestoreConfirmation() {
@@ -213,6 +254,29 @@ export default function BackupRestorePage() {
               {restore.isPending ? <RotateCcw className="animate-spin" size={17} /> : <Upload size={17} />}
               {restore.isPending ? "Restaurando..." : "Restaurar backup"}
             </Button>
+            {restoreProgress.length > 0 && (
+              <div className="rounded-xl border border-slate-700 bg-background p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-semibold">Evolucao da restauracao</h3>
+                  {restore.isPending && <span className="text-xs text-slate-400">Processando...</span>}
+                </div>
+                <div className="max-h-64 space-y-2 overflow-y-auto text-xs leading-5">
+                  {restoreProgress.map((event, index) => (
+                    <p
+                      key={`${event.type}-${index}-${event.message}`}
+                      className={cn(
+                        "rounded-lg border px-3 py-2",
+                        event.type === "success" && "border-emerald-500/30 bg-emerald-500/10 text-emerald-100",
+                        event.type === "error" && "border-red-500/30 bg-red-500/10 text-red-100",
+                        event.type === "info" && "border-slate-800 bg-sidebar/60 text-slate-300"
+                      )}
+                    >
+                      {event.message}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
           </form>
         </Card>
       </section>
