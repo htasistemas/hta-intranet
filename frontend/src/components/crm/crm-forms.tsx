@@ -1,11 +1,16 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import { Controller, useForm, type Path, type UseFormRegister } from "react-hook-form";
+import { useState } from "react";
+import { Controller, useForm, type Path, type SubmitErrorHandler, type UseFormRegister } from "react-hook-form";
 import { z } from "zod";
+import { api } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input, Textarea } from "@/components/ui/input";
+import { useToast } from "@/contexts/toast-context";
 import { currencyInputToNumber, numberToCurrencyInput } from "@/lib/currency-input";
+import { cn } from "@/lib/utils";
 import type { CrmActivity, CrmAutomation, CrmLead, CrmProject, CrmProposal } from "@/types/crm";
 
 const emptyToNull = (value: unknown): unknown => value === "" ? null : value;
@@ -140,8 +145,104 @@ function FormSection({ title, description, children }: { title: string; descript
   );
 }
 
+type LeadTabId = "identity" | "contact" | "address" | "commercial" | "notes";
+
+const leadTabs: Array<{ id: LeadTabId; label: string }> = [
+  { id: "identity", label: "Identificacao" },
+  { id: "contact", label: "Contato" },
+  { id: "address", label: "Endereco" },
+  { id: "commercial", label: "Comercial" },
+  { id: "notes", label: "Observacoes" }
+];
+
+const leadFieldTabs: Partial<Record<keyof LeadFormValues, LeadTabId>> = {
+  name: "identity",
+  company: "identity",
+  document: "identity",
+  segment: "identity",
+  position: "commercial",
+  email: "contact",
+  phone: "contact",
+  whatsapp: "contact",
+  site: "contact",
+  postalCode: "address",
+  street: "address",
+  number: "address",
+  district: "address",
+  city: "address",
+  state: "address",
+  source: "commercial",
+  campaign: "commercial",
+  responsible: "commercial",
+  interest: "commercial",
+  productInterest: "commercial",
+  estimatedValue: "commercial",
+  observations: "notes",
+  score: "identity",
+  priority: "identity",
+  status: "identity",
+  stage: "commercial",
+  lostReason: "notes",
+  lastInteractionAt: "commercial",
+  nextFollowUpAt: "commercial"
+};
+
+const selectClass = "h-11 w-full rounded-xl border border-slate-700 bg-sidebar px-3 text-sm text-foreground outline-none focus:border-accent";
+
+function onlyDigits(value: string): string {
+  return value.replace(/\D/g, "");
+}
+
+function maskCnpj(value: string): string {
+  const digits = onlyDigits(value).slice(0, 14);
+  return digits.replace(/^(\d{2})(\d)/, "$1.$2").replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3").replace(/\.(\d{3})(\d)/, ".$1/$2").replace(/(\d{4})(\d)/, "$1-$2");
+}
+
+function maskCep(value: string): string {
+  return onlyDigits(value).slice(0, 8).replace(/(\d{5})(\d)/, "$1-$2");
+}
+
+function maskPhone(value: string): string {
+  const digits = onlyDigits(value).slice(0, 11);
+  if (digits.length <= 10) return digits.replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{4})(\d)/, "$1-$2");
+  return digits.replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{5})(\d)/, "$1-$2");
+}
+
+function dateInput(value: string | null | undefined): string {
+  return value?.slice(0, 10) ?? "";
+}
+
+interface CepLookup {
+  postalCode: string;
+  street: string;
+  district: string;
+  city: string;
+  state: string;
+}
+
+interface CnpjLookup extends CepLookup {
+  document: string;
+  name: string;
+  legalName: string;
+  email: string;
+  phone: string;
+  number: string;
+  segment: string;
+  openingDate: string;
+}
+
+async function lookupLeadCep(cep: string): Promise<CepLookup> {
+  return api.get<CepLookup>(`/lookup/cep/${onlyDigits(cep)}`);
+}
+
+async function lookupLeadCnpj(cnpj: string): Promise<CnpjLookup> {
+  return api.get<CnpjLookup>(`/lookup/cnpj/${onlyDigits(cnpj)}`);
+}
+
 export function LeadForm({ lead, onCancel, onSave }: { lead?: CrmLead; onCancel: () => void; onSave: (input: LeadFormInput) => Promise<void> }) {
-  const { register, control, handleSubmit, formState: { errors, isSubmitting } } = useForm<LeadFormValues, unknown, LeadFormInput>({
+  const [activeTab, setActiveTab] = useState<LeadTabId>("identity");
+  const { toast } = useToast();
+  const { register, control, handleSubmit, setValue, getValues, formState: { errors, isSubmitting } } = useForm<LeadFormValues, unknown, LeadFormInput>({
     resolver: zodResolver(leadFormSchema),
     defaultValues: {
       name: lead?.name ?? "",
@@ -171,18 +272,58 @@ export function LeadForm({ lead, onCancel, onSave }: { lead?: CrmLead; onCancel:
       status: lead?.status ?? "NEW",
       stage: lead?.stage ?? "LEAD_RECEIVED",
       lostReason: lead?.lostReason ?? "",
-      lastInteractionAt: lead?.lastInteractionAt ?? "",
-      nextFollowUpAt: lead?.nextFollowUpAt ?? ""
+      lastInteractionAt: dateInput(lead?.lastInteractionAt),
+      nextFollowUpAt: dateInput(lead?.nextFollowUpAt)
     }
   });
+
+  const cepLookup = useMutation({
+    mutationFn: lookupLeadCep,
+    onSuccess: (data) => {
+      setValue("postalCode", maskCep(data.postalCode));
+      setValue("street", data.street);
+      setValue("district", data.district);
+      setValue("city", data.city);
+      setValue("state", data.state);
+      toast("Endereco preenchido pelo CEP.");
+    },
+    onError: (error) => toast(error.message, "error")
+  });
+
+  const cnpjLookup = useMutation({
+    mutationFn: lookupLeadCnpj,
+    onSuccess: (data) => {
+      setValue("document", maskCnpj(data.document));
+      setValue("name", data.name || data.legalName);
+      setValue("company", data.legalName);
+      setValue("email", data.email);
+      setValue("phone", maskPhone(data.phone));
+      setValue("postalCode", maskCep(data.postalCode));
+      setValue("street", data.street);
+      setValue("number", data.number);
+      setValue("district", data.district);
+      setValue("city", data.city);
+      setValue("state", data.state);
+      setValue("segment", data.segment);
+      toast("Captacao preenchida pelo CNPJ.");
+    },
+    onError: (error) => toast(error.message, "error")
+  });
+
+  const handleInvalid: SubmitErrorHandler<LeadFormValues> = (validationErrors) => {
+    const firstField = Object.keys(validationErrors)[0] as keyof LeadFormValues | undefined;
+    if (firstField) setActiveTab(leadFieldTabs[firstField] ?? "identity");
+    toast("Revise os campos destacados antes de salvar.", "error");
+  };
+
   return (
-    <form className="space-y-5" onSubmit={(event) => void handleSubmit(onSave)(event)}>
-      <header className="rounded-2xl border border-slate-700 bg-card p-4">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0">
+    <form className="space-y-6" onSubmit={(event) => void handleSubmit(onSave, handleInvalid)(event)}>
+      <header className="rounded-xl border border-slate-700 bg-sidebar p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
             <p className="text-xs uppercase text-slate-500">{lead ? "Edicao de captacao" : "Nova captacao"}</p>
-            <h2 className="mt-1 truncate text-xl font-semibold">{lead?.name ?? "Possivel cliente"}</h2>
-            <p className="mt-1 text-sm text-slate-400">{lead?.company ?? "Cadastro comercial para prospeccao"}</p>
+            <h2 className="mt-1 text-lg font-semibold">{getValues("name") || "Possivel cliente"}</h2>
+            <p className="mt-1 text-sm text-slate-400">{String(getValues("company") || "Cadastro comercial para prospeccao")}</p>
           </div>
           <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[520px]">
             <SelectField label="Status" name="status" register={register} options={[{ value: "NEW", label: "Novo" }, { value: "IN_SERVICE", label: "Em Atendimento" }, { value: "QUALIFIED", label: "Qualificado" }, { value: "PROPOSAL_SENT", label: "Proposta Enviada" }, { value: "NEGOTIATION", label: "Negociacao" }, { value: "WON", label: "Fechado Ganho" }, { value: "LOST", label: "Fechado Perdido" }]} />
@@ -192,57 +333,74 @@ export function LeadForm({ lead, onCancel, onSave }: { lead?: CrmLead; onCancel:
         </div>
       </header>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,.9fr)]">
-        <div className="space-y-5">
-          <FormSection title="Identificacao da instituicao" description="Dados principais usados para reconhecer e localizar a oportunidade.">
-            <div className="grid gap-3 md:grid-cols-2">
-              <label className="space-y-1 text-sm text-slate-300"><span>Nome fantasia / Sigla</span><Input placeholder="Ex: AMPLIT" {...register("name")} /><FieldError message={errors.name?.message} /></label>
-              <label className="space-y-1 text-sm text-slate-300"><span>Razao social</span><Input placeholder="Nome juridico da instituicao" {...register("company")} /></label>
-              <label className="space-y-1 text-sm text-slate-300"><span>CNPJ</span><Input placeholder="00.000.000/0000-00" {...register("document")} /></label>
-              <label className="space-y-1 text-sm text-slate-300"><span>Segmento / Area principal</span><Input placeholder="Assistencia social, educacao..." {...register("segment")} /></label>
-            </div>
-          </FormSection>
+      <div className="grid gap-5 lg:grid-cols-[180px_minmax(0,1fr)]">
+        <nav className="flex gap-2 overflow-x-auto border-b border-slate-700 pb-2 lg:flex-col lg:overflow-visible lg:border-b-0 lg:border-r lg:pb-0 lg:pr-4">
+          {leadTabs.map((tab) => (
+            <button key={tab.id} type="button" className={cn("whitespace-nowrap rounded-xl px-3 py-2 text-left text-sm text-slate-400 transition hover:bg-white/5", activeTab === tab.id && "bg-accent/10 text-accent")} onClick={() => setActiveTab(tab.id)}>
+              {tab.label}
+            </button>
+          ))}
+        </nav>
 
-          <FormSection title="Contato e localizacao" description="Canais de abordagem e endereco operacional.">
-            <div className="grid gap-3 md:grid-cols-3">
-              <label className="space-y-1 text-sm text-slate-300"><span>E-mail</span><Input type="email" placeholder="contato@instituicao.org.br" {...register("email")} /><FieldError message={errors.email?.message} /></label>
-              <label className="space-y-1 text-sm text-slate-300"><span>Telefone</span><Input placeholder="(00) 0000-0000" {...register("phone")} /></label>
-              <label className="space-y-1 text-sm text-slate-300"><span>WhatsApp</span><Input placeholder="(00) 00000-0000" {...register("whatsapp")} /></label>
-              <label className="space-y-1 text-sm text-slate-300 md:col-span-2"><span>Site / Instagram</span><Input placeholder="https://..." {...register("site")} /></label>
-              <label className="space-y-1 text-sm text-slate-300"><span>CEP</span><Input {...register("postalCode")} /></label>
-              <label className="space-y-1 text-sm text-slate-300 md:col-span-2"><span>Endereco completo</span><Input {...register("street")} /></label>
-              <label className="space-y-1 text-sm text-slate-300"><span>Numero</span><Input {...register("number")} /></label>
-              <label className="space-y-1 text-sm text-slate-300"><span>Bairro</span><Input {...register("district")} /></label>
-              <label className="space-y-1 text-sm text-slate-300"><span>Cidade</span><Input {...register("city")} /></label>
-              <label className="space-y-1 text-sm text-slate-300"><span>UF</span><Input maxLength={2} {...register("state")} /></label>
-            </div>
-          </FormSection>
-        </div>
+        <section className="min-w-0">
+          {activeTab === "identity" && (
+            <fieldset className="grid gap-4 md:grid-cols-3">
+              <label className="md:col-span-2">Razao social<Input placeholder="Nome juridico da instituicao" {...register("company")} /></label>
+              <label>Nome fantasia / Sigla<Input placeholder="Ex: AMPLIT" {...register("name")} /><FieldError message={errors.name?.message} /></label>
+              <label>CNPJ<Controller control={control} name="document" render={({ field }) => <div className="flex gap-2"><Input value={maskCnpj(String(field.value ?? ""))} onChange={(event) => field.onChange(maskCnpj(event.target.value))} placeholder="00.000.000/0000-00" /><Button type="button" variant="outline" onClick={() => cnpjLookup.mutate(String(field.value ?? ""))} disabled={cnpjLookup.isPending}>Buscar</Button></div>} /></label>
+              <label>Segmento / Area principal<Input placeholder="Assistencia social, educacao..." {...register("segment")} /></label>
+            </fieldset>
+          )}
 
-        <div className="space-y-5">
-          <FormSection title="Qualificacao comercial" description="Classificacao para priorizar abordagem e conversao.">
-            <div className="grid gap-3">
-              <label className="space-y-1 text-sm text-slate-300"><span>Responsavel interno</span><Input placeholder="Consultor responsavel" {...register("responsible")} /><FieldError message={errors.responsible?.message} /></label>
-              <label className="space-y-1 text-sm text-slate-300"><span>Origem</span><Input placeholder="Mapa OSC, evento, indicacao..." {...register("source")} /></label>
-              <label className="space-y-1 text-sm text-slate-300"><span>Campanha</span><Input placeholder="OSC MG 2026" {...register("campaign")} /></label>
-              <label className="space-y-1 text-sm text-slate-300"><span>Contato decisor / Cargo</span><Input placeholder="Presidente, diretor, coordenador..." {...register("position")} /></label>
-              <label className="space-y-1 text-sm text-slate-300"><span>Dor / Interesse</span><Input placeholder="Gestao, captacao, portal, atendimento..." {...register("interest")} /></label>
-              <label className="space-y-1 text-sm text-slate-300"><span>Produto de interesse</span><Input placeholder="Sistema, consultoria, projeto..." {...register("productInterest")} /></label>
-              <Controller control={control} name="estimatedValue" render={({ field }) => <label className="space-y-1 text-sm text-slate-300"><span>Valor estimado</span><CurrencyInput value={String(field.value ?? "")} onChange={field.onChange} /></label>} />
-            </div>
-          </FormSection>
+          {activeTab === "contact" && (
+            <fieldset className="grid gap-4 md:grid-cols-3">
+              <label>E-mail<Input type="email" placeholder="contato@instituicao.org.br" {...register("email")} /><FieldError message={errors.email?.message} /></label>
+              <Controller control={control} name="phone" render={({ field }) => <label>Telefone<Input value={maskPhone(String(field.value ?? ""))} onChange={(event) => field.onChange(maskPhone(event.target.value))} placeholder="(00) 0000-0000" /></label>} />
+              <Controller control={control} name="whatsapp" render={({ field }) => <label>WhatsApp<Input value={maskPhone(String(field.value ?? ""))} onChange={(event) => field.onChange(maskPhone(event.target.value))} placeholder="(00) 00000-0000" /></label>} />
+              <label className="md:col-span-3">Site / Instagram<Input placeholder="https://..." {...register("site")} /></label>
+            </fieldset>
+          )}
 
-          <FormSection title="Historico e observacoes" description="Contexto importado da base e anotacoes do atendimento.">
-            <label className="block space-y-1 text-sm text-slate-300"><span>Observacoes</span><Textarea className="min-h-48" {...register("observations")} /></label>
-          </FormSection>
-        </div>
+          {activeTab === "address" && (
+            <fieldset className="grid gap-4 md:grid-cols-4">
+              <Controller control={control} name="postalCode" render={({ field }) => <label>CEP<div className="flex gap-2"><Input value={maskCep(String(field.value ?? ""))} onChange={(event) => field.onChange(maskCep(event.target.value))} /><Button type="button" variant="outline" onClick={() => cepLookup.mutate(String(getValues("postalCode") ?? ""))} disabled={cepLookup.isPending}>Buscar</Button></div></label>} />
+              <label className="md:col-span-2">Logradouro<Input {...register("street")} /></label>
+              <label>Numero<Input {...register("number")} /></label>
+              <label>Bairro<Input {...register("district")} /></label>
+              <label className="md:col-span-2">Cidade<Input {...register("city")} /></label>
+              <label>UF<Input maxLength={2} {...register("state")} /></label>
+            </fieldset>
+          )}
+
+          {activeTab === "commercial" && (
+            <fieldset className="grid gap-4 md:grid-cols-3">
+              <label>Responsavel interno<Input placeholder="Consultor responsavel" {...register("responsible")} /><FieldError message={errors.responsible?.message} /></label>
+              <label>Origem<Input placeholder="Mapa OSC, evento, indicacao..." {...register("source")} /></label>
+              <label>Campanha<Input placeholder="OSC MG 2026" {...register("campaign")} /></label>
+              <label>Contato decisor / Cargo<Input placeholder="Presidente, diretor, coordenador..." {...register("position")} /></label>
+              <label>Dor / Interesse<Input placeholder="Gestao, captacao, portal, atendimento..." {...register("interest")} /></label>
+              <label>Produto de interesse<Input placeholder="Sistema, consultoria, projeto..." {...register("productInterest")} /></label>
+              <Controller control={control} name="estimatedValue" render={({ field }) => <label>Valor estimado<CurrencyInput value={String(field.value ?? "")} onChange={field.onChange} /></label>} />
+              <label>Etapa<select className={selectClass} {...register("stage")}><option value="LEAD_RECEIVED">Lead recebido</option><option value="FIRST_CONTACT">Primeiro contato</option><option value="QUALIFICATION">Qualificacao</option><option value="DEMONSTRATION">Demonstracao</option><option value="PROPOSAL_SENT">Proposta enviada</option><option value="NEGOTIATION">Negociacao</option><option value="APPROVAL">Aprovacao</option><option value="IMPLEMENTATION">Implantacao</option><option value="SALE_COMPLETED">Venda concluida</option><option value="LOST">Perdido</option></select></label>
+              <label>Ultima interacao<Input type="date" {...register("lastInteractionAt")} /></label>
+              <label>Proximo follow-up<Input type="date" {...register("nextFollowUpAt")} /></label>
+            </fieldset>
+          )}
+
+          {activeTab === "notes" && (
+            <fieldset className="grid gap-4">
+              <label>Motivo de perda<Input {...register("lostReason")} /></label>
+              <label>Observacoes<Textarea className="min-h-56" {...register("observations")} /></label>
+            </fieldset>
+          )}
+        </section>
       </div>
 
-      <div className="sticky bottom-0 z-10 flex flex-col gap-3 border-t border-slate-700 bg-card/95 pt-4 backdrop-blur sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 border-t border-slate-700 pt-4 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-slate-400">{lead ? "Atualize os dados e salve a captacao." : "Preencha os dados principais para criar a captacao."}</p>
         <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={onCancel}>Cancelar</Button>
-          <Button disabled={isSubmitting}>{isSubmitting ? "Salvando..." : "Salvar captacao"}</Button>
+          <Button type="submit" disabled={isSubmitting}>{isSubmitting ? "Salvando..." : "Salvar captacao"}</Button>
         </div>
       </div>
     </form>

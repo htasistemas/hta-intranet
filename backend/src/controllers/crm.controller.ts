@@ -112,6 +112,10 @@ export class CrmController {
     response.json(await this.service.convertLead(resourceId(request), userId(request)));
   };
 
+  public activateLead = async (request: Request, response: Response): Promise<void> => {
+    response.json(await this.service.activateLeadAsClient(resourceId(request), userId(request)));
+  };
+
   public listClients = async (request: Request, response: Response): Promise<void> => {
     const query = querySchema.parse(request.query);
     const result = await this.service.listClients(userId(request), query);

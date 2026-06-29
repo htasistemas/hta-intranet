@@ -46,6 +46,7 @@ export class CrmRepository {
     const where: Prisma.CrmLeadWhereInput = {
       ...scope,
       deletedAt: null,
+      convertedAt: null,
       ...(filters.status ? { status: filters.status } : {}),
       ...(filters.stage ? { stage: filters.stage } : {}),
       ...(filters.responsible ? { responsible: { contains: filters.responsible, mode: "insensitive" } } : {}),

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Edit3, Plus, Search, Trash2, TrendingUp, Upload } from "lucide-react";
+import { Edit3, LayoutGrid, List, Plus, Search, Trash2, TrendingUp, Upload, UserCheck } from "lucide-react";
 import { api } from "@/services/api";
 import type { PageResult } from "@/types";
 import type { CrmLead, CrmLeadCityStat, CrmLeadImportResult, CrmLeadScore, CrmLeadStats, CrmLeadStatus } from "@/types/crm";
@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { LeadImportDialog } from "@/components/crm/lead-import-dialog";
 import { LeadForm, type LeadFormInput } from "@/components/crm/crm-forms";
 import { useToast } from "@/contexts/toast-context";
-import { currency } from "@/lib/utils";
+import { cn, currency } from "@/lib/utils";
 
 const statusLabels: Record<CrmLeadStatus, string> = {
   NEW: "Novo",
@@ -34,6 +34,7 @@ const scoreLabels: Record<CrmLeadScore, string> = {
 
 export default function ProspectingPage() {
   const [search, setSearch] = useState("");
+  const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
   const [opened, setOpened] = useState(false);
   const [importOpened, setImportOpened] = useState(false);
   const [selected, setSelected] = useState<CrmLead | undefined>();
@@ -73,6 +74,16 @@ export default function ProspectingPage() {
     onError: (error) => toast(error.message, "error")
   });
 
+  const activateClient = useMutation({
+    mutationFn: (leadId: string) => api.post<unknown>(`/crm/leads/${leadId}/activate-client`, {}),
+    onSuccess: () => {
+      refreshLists();
+      void queryClient.invalidateQueries({ queryKey: ["clients"] });
+      toast("Captacao movida para clientes ativos.");
+    },
+    onError: (error) => toast(error.message, "error")
+  });
+
   const handleImported = (result: CrmLeadImportResult) => {
     refreshLists();
     const message = result.failed ? `${result.created} captacao(oes) importada(s). ${result.failed} linha(s) com erro.` : `${result.created} captacao(oes) importada(s) com sucesso.`;
@@ -108,40 +119,76 @@ export default function ProspectingPage() {
           <Search className="absolute left-3 top-3 text-slate-500" size={18} />
           <Input className="pl-10" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por nome, cidade, UF, CNPJ ou email" />
         </label>
+        <div className="grid grid-cols-2 rounded-xl border border-slate-700 bg-sidebar p-1">
+          <button type="button" className={cn("inline-flex h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm text-slate-400 transition", viewMode === "cards" && "bg-accent/10 text-accent")} onClick={() => setViewMode("cards")} aria-pressed={viewMode === "cards"}>
+            <LayoutGrid size={17} /> Cards
+          </button>
+          <button type="button" className={cn("inline-flex h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm text-slate-400 transition", viewMode === "list" && "bg-accent/10 text-accent")} onClick={() => setViewMode("list")} aria-pressed={viewMode === "list"}>
+            <List size={17} /> Lista
+          </button>
+        </div>
         <Button variant="outline" onClick={() => setImportOpened(true)}><Upload size={17} /> Importar</Button>
         <Button onClick={() => { setSelected(undefined); setOpened(true); }}><Plus size={17} /> Nova captacao</Button>
       </div>
 
       {isLoading ? <Skeleton className="h-96" /> : (
-        <section className="grid gap-4 xl:grid-cols-3">
-          {leads.map((lead) => (
-            <Card key={lead.id} className="cursor-pointer" onClick={() => { setSelected(lead); setOpened(true); }}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h2 className="truncate font-semibold">{lead.name}</h2>
-                  <p className="truncate text-sm text-slate-400">{lead.company ?? lead.email ?? "Sem empresa"}</p>
+        viewMode === "cards" ? (
+          <section className="grid gap-4 xl:grid-cols-3">
+            {leads.map((lead) => (
+              <Card key={lead.id} className="cursor-pointer" onClick={() => { setSelected(lead); setOpened(true); }}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h2 className="truncate font-semibold">{lead.name}</h2>
+                    <p className="truncate text-sm text-slate-400">{lead.company ?? lead.email ?? "Sem empresa"}</p>
+                  </div>
+                  <div className="flex shrink-0 gap-1" onClick={(event) => event.stopPropagation()}>
+                    <Button type="button" variant="outline" size="sm" onClick={() => activateClient.mutate(lead.id)} disabled={activateClient.isPending} aria-label="Ativar como cliente"><UserCheck size={16} /> Ativar</Button>
+                    <Button type="button" variant="ghost" size="icon" onClick={() => { setSelected(lead); setOpened(true); }} aria-label="Editar captacao"><Edit3 size={16} /></Button>
+                    <Button type="button" variant="danger" size="icon" onClick={() => setLeadToDelete(lead)} disabled={remove.isPending} aria-label="Excluir captacao"><Trash2 size={16} /></Button>
+                  </div>
                 </div>
-                <div className="flex shrink-0 gap-1" onClick={(event) => event.stopPropagation()}>
-                  <Button type="button" variant="ghost" size="icon" onClick={() => { setSelected(lead); setOpened(true); }} aria-label="Editar captacao"><Edit3 size={16} /></Button>
-                  <Button type="button" variant="danger" size="icon" onClick={() => setLeadToDelete(lead)} disabled={remove.isPending} aria-label="Excluir captacao"><Trash2 size={16} /></Button>
+                <p className="mt-4 text-2xl font-semibold">{currency(Number(lead.estimatedValue ?? 0))}</p>
+                <div className="mt-4 flex flex-wrap gap-2 text-xs">
+                  <span className="rounded-full bg-accent/10 px-2 py-1 text-accent">{statusLabels[lead.status]}</span>
+                  <span className="rounded-full bg-amber-500/15 px-2 py-1 text-amber-200">{scoreLabels[lead.score]}</span>
+                  <span className="rounded-full bg-blue-500/15 px-2 py-1 text-blue-200">{lead.source ?? "Origem nao informada"}</span>
                 </div>
-              </div>
-              <p className="mt-4 text-2xl font-semibold">{currency(Number(lead.estimatedValue ?? 0))}</p>
-              <div className="mt-4 flex flex-wrap gap-2 text-xs">
-                <span className="rounded-full bg-accent/10 px-2 py-1 text-accent">{statusLabels[lead.status]}</span>
-                <span className="rounded-full bg-amber-500/15 px-2 py-1 text-amber-200">{scoreLabels[lead.score]}</span>
-                <span className="rounded-full bg-blue-500/15 px-2 py-1 text-blue-200">{lead.source ?? "Origem nao informada"}</span>
-              </div>
-              <div className="mt-4 flex items-center gap-2 text-xs text-slate-400">
-                <TrendingUp size={14} />
-                <span>{lead.segment ?? "Segmento nao informado"} - {lead.responsible}</span>
-              </div>
-            </Card>
-          ))}
-        </section>
+                <div className="mt-4 flex items-center gap-2 text-xs text-slate-400">
+                  <TrendingUp size={14} />
+                  <span>{lead.segment ?? "Segmento nao informado"} - {lead.responsible}</span>
+                </div>
+              </Card>
+            ))}
+          </section>
+        ) : (
+          <Card className="overflow-x-auto p-0">
+            <table className="w-full min-w-[980px] text-left text-sm">
+              <thead className="border-b border-slate-700 text-xs uppercase text-slate-400">
+                <tr><th className="p-4">Captacao</th><th>Contato</th><th>Localidade</th><th>Status</th><th>Valor</th><th>Responsavel</th><th /></tr>
+              </thead>
+              <tbody>{leads.map((lead) => (
+                <tr key={lead.id} className="border-b border-slate-700/50 transition hover:bg-white/[.025]">
+                  <td className="p-4"><p className="font-medium">{lead.name}</p><p className="text-xs text-slate-400">{lead.company ?? lead.segment ?? "Sem empresa"}</p></td>
+                  <td><p>{lead.email ?? "-"}</p><p className="text-xs text-slate-400">{lead.whatsapp ?? lead.phone ?? ""}</p></td>
+                  <td>{[lead.city, lead.state].filter(Boolean).join(" / ") || "-"}</td>
+                  <td><div className="flex flex-wrap gap-2"><span className="rounded-full bg-accent/10 px-2 py-1 text-xs text-accent">{statusLabels[lead.status]}</span><span className="rounded-full bg-amber-500/15 px-2 py-1 text-xs text-amber-200">{scoreLabels[lead.score]}</span></div></td>
+                  <td>{currency(Number(lead.estimatedValue ?? 0))}</td>
+                  <td>{lead.responsible}</td>
+                  <td>
+                    <div className="flex justify-end gap-1 pr-3">
+                      <Button type="button" variant="outline" size="sm" onClick={() => activateClient.mutate(lead.id)} disabled={activateClient.isPending} aria-label="Ativar como cliente"><UserCheck size={16} /> Ativar</Button>
+                      <Button type="button" variant="ghost" size="icon" onClick={() => { setSelected(lead); setOpened(true); }} aria-label="Editar captacao"><Edit3 size={16} /></Button>
+                      <Button type="button" variant="danger" size="icon" onClick={() => setLeadToDelete(lead)} disabled={remove.isPending} aria-label="Excluir captacao"><Trash2 size={16} /></Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </Card>
+        )
       )}
 
-      <Dialog open={opened} title={selected ? "Editar captacao" : "Nova captacao"} onClose={() => setOpened(false)}>
+      <Dialog open={opened} title={selected ? "Editar captacao" : "Nova captacao"} onClose={() => setOpened(false)} className="max-w-[96vw] xl:max-w-7xl">
         <LeadForm lead={selected} onCancel={() => setOpened(false)} onSave={(input) => save.mutateAsync(input).then(() => undefined)} />
       </Dialog>
       <LeadImportDialog open={importOpened} onClose={() => setImportOpened(false)} onImported={handleImported} />

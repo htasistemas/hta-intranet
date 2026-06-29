@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { Controller, useForm, useWatch } from "react-hook-form";
+import { Controller, useForm, useWatch, type SubmitErrorHandler } from "react-hook-form";
 import { z } from "zod";
 import { api } from "@/services/api";
 import type { Category, Client, PageResult, Project } from "@/types";
@@ -122,6 +122,55 @@ const tabs: Array<{ id: TabId; label: string }> = [
   { id: "projects", label: "Projetos" },
   { id: "lgpd", label: "LGPD" }
 ];
+
+const fieldTabs: Partial<Record<keyof Fields, TabId>> = {
+  name: "identity",
+  document: "identity",
+  type: "identity",
+  internalCode: "identity",
+  legalName: "identity",
+  tradeName: "identity",
+  stateRegistration: "identity",
+  municipalRegistration: "identity",
+  openingDate: "identity",
+  birthDate: "identity",
+  gender: "identity",
+  phone: "contact",
+  whatsapp: "contact",
+  email: "contact",
+  postalCode: "address",
+  street: "address",
+  number: "address",
+  district: "address",
+  city: "address",
+  state: "address",
+  observations: "commercial",
+  status: "identity",
+  source: "commercial",
+  segment: "commercial",
+  companySize: "identity",
+  responsible: "commercial",
+  priority: "identity",
+  temperature: "identity",
+  firstPurchaseAt: "commercial",
+  lastPurchaseAt: "commercial",
+  nextFollowUpAt: "commercial",
+  categoryId: "commercial",
+  expectedValue: "commercial",
+  averageTicket: "commercial",
+  purchasePotential: "commercial",
+  creditLimit: "financial",
+  paymentTerms: "financial",
+  preferredPaymentMethod: "financial",
+  billingDay: "financial",
+  financialStatus: "financial",
+  financialNotes: "financial",
+  allowEmailMarketing: "lgpd",
+  allowWhatsapp: "lgpd",
+  allowCalls: "lgpd",
+  consentDate: "lgpd",
+  projectIds: "projects"
+};
 
 const selectClass = "h-11 w-full rounded-xl border border-slate-700 bg-sidebar px-3 text-sm text-foreground outline-none focus:border-accent";
 
@@ -373,8 +422,14 @@ export function ClientForm({ client, onSave, onCancel }: { client?: Client; onSa
     });
   };
 
+  const handleInvalid: SubmitErrorHandler<Fields> = (validationErrors) => {
+    const firstField = Object.keys(validationErrors)[0] as keyof Fields | undefined;
+    if (firstField) setActiveTab(fieldTabs[firstField] ?? "identity");
+    toast("Revise os campos destacados antes de salvar.", "error");
+  };
+
   return (
-    <form className="space-y-6" onSubmit={(event) => void handleSubmit(submit)(event)}>
+    <form className="space-y-6" onSubmit={(event) => void handleSubmit(submit, handleInvalid)(event)}>
       <header className="rounded-xl border border-slate-700 bg-sidebar p-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
@@ -389,23 +444,25 @@ export function ClientForm({ client, onSave, onCancel }: { client?: Client; onSa
         </div>
       </header>
 
-      <nav className="flex gap-2 overflow-x-auto border-b border-slate-700 pb-2">
-        {tabs.map((tab) => (
-          <button key={tab.id} type="button" className={cn("whitespace-nowrap rounded-xl px-3 py-2 text-sm text-slate-400 transition hover:bg-white/5", activeTab === tab.id && "bg-accent/10 text-accent")} onClick={() => setActiveTab(tab.id)}>
-            {tab.label}
-          </button>
-        ))}
-      </nav>
+      <div className="grid gap-5 lg:grid-cols-[180px_minmax(0,1fr)]">
+        <nav className="flex gap-2 overflow-x-auto border-b border-slate-700 pb-2 lg:flex-col lg:overflow-visible lg:border-b-0 lg:border-r lg:pb-0 lg:pr-4">
+          {tabs.map((tab) => (
+            <button key={tab.id} type="button" className={cn("whitespace-nowrap rounded-xl px-3 py-2 text-left text-sm text-slate-400 transition hover:bg-white/5", activeTab === tab.id && "bg-accent/10 text-accent")} onClick={() => setActiveTab(tab.id)}>
+              {tab.label}
+            </button>
+          ))}
+        </nav>
 
-      {activeTab === "identity" && (
+        <section className="min-w-0">
+          {activeTab === "identity" && (
         <fieldset className="grid gap-4 md:grid-cols-3">
           <label>Tipo<select className={selectClass} {...register("type")}><option value="INDIVIDUAL">Pessoa fisica</option><option value="COMPANY">Empresa</option></select></label>
           <label>Codigo interno<Input placeholder="CLI-0001" {...register("internalCode")} /></label>
           <label>{isCompany ? "CNPJ" : "CPF"}<Controller control={control} name="document" render={({ field }) => <div className="flex gap-2"><Input value={isCompany ? maskCnpj(field.value) : maskCpf(field.value)} onChange={(event) => field.onChange(isCompany ? maskCnpj(event.target.value) : maskCpf(event.target.value))} />{isCompany && <Button type="button" variant="outline" onClick={() => cnpjLookup.mutate(field.value)} disabled={cnpjLookup.isPending}>Buscar</Button>}</div>} /></label>
-          <label className="md:col-span-2">{isCompany ? "Nome fantasia / Nome exibido" : "Nome completo"}<Input {...register("name")} /><FieldError message={errors.name?.message} /></label>
+          <label className="md:col-span-2">{isCompany ? "Nome exibido" : "Nome completo"}<Input {...register("name")} /><FieldError message={errors.name?.message} /></label>
           {isCompany ? (
             <>
-              <label>Razao social<Input {...register("legalName")} /></label>
+              <label className="md:col-span-2">Razao social<Input {...register("legalName")} /></label>
               <label>Nome fantasia<Input {...register("tradeName")} /></label>
               <label>Data de abertura<Input type="date" {...register("openingDate")} /></label>
               <label>Inscricao estadual<Input {...register("stateRegistration")} /></label>
@@ -418,30 +475,30 @@ export function ClientForm({ client, onSave, onCancel }: { client?: Client; onSa
               <label>Sexo<select className={selectClass} {...register("gender")}><option value="">Selecione</option><option value="FEMALE">Feminino</option><option value="MALE">Masculino</option><option value="NON_BINARY">Nao binario</option><option value="NOT_INFORMED">Prefiro nao informar</option></select></label>
             </>
           )}
-        </fieldset>
-      )}
+          </fieldset>
+          )}
 
-      {activeTab === "contact" && (
-        <fieldset className="grid gap-4 md:grid-cols-3">
-          <Controller control={control} name="phone" render={({ field }) => <label>Telefone<Input value={maskPhone(field.value)} onChange={(event) => field.onChange(maskPhone(event.target.value))} /></label>} />
-          <Controller control={control} name="whatsapp" render={({ field }) => <label>WhatsApp<Input value={maskPhone(field.value)} onChange={(event) => field.onChange(maskPhone(event.target.value))} /></label>} />
-          <label>Email<Input type="email" {...register("email")} /><FieldError message={errors.email?.message} /></label>
-        </fieldset>
-      )}
+          {activeTab === "contact" && (
+            <fieldset className="grid gap-4 md:grid-cols-3">
+              <Controller control={control} name="phone" render={({ field }) => <label>Telefone<Input value={maskPhone(field.value)} onChange={(event) => field.onChange(maskPhone(event.target.value))} /></label>} />
+              <Controller control={control} name="whatsapp" render={({ field }) => <label>WhatsApp<Input value={maskPhone(field.value)} onChange={(event) => field.onChange(maskPhone(event.target.value))} /></label>} />
+              <label>Email<Input type="email" {...register("email")} /><FieldError message={errors.email?.message} /></label>
+            </fieldset>
+          )}
 
-      {activeTab === "address" && (
-        <fieldset className="grid gap-4 md:grid-cols-4">
-          <Controller control={control} name="postalCode" render={({ field }) => <label>CEP<div className="flex gap-2"><Input value={maskCep(field.value)} onChange={(event) => field.onChange(maskCep(event.target.value))} /><Button type="button" variant="outline" onClick={() => cepLookup.mutate(getValues("postalCode"))} disabled={cepLookup.isPending}>Buscar</Button></div></label>} />
-          <label className="md:col-span-2">Logradouro<Input {...register("street")} /></label>
-          <label>Numero<Input {...register("number")} /></label>
-          <label>Bairro<Input {...register("district")} /></label>
-          <label className="md:col-span-2">Cidade<Input {...register("city")} /></label>
-          <label>Estado<Input maxLength={2} {...register("state")} /></label>
-        </fieldset>
-      )}
+          {activeTab === "address" && (
+            <fieldset className="grid gap-4 md:grid-cols-4">
+              <Controller control={control} name="postalCode" render={({ field }) => <label>CEP<div className="flex gap-2"><Input value={maskCep(field.value)} onChange={(event) => field.onChange(maskCep(event.target.value))} /><Button type="button" variant="outline" onClick={() => cepLookup.mutate(getValues("postalCode"))} disabled={cepLookup.isPending}>Buscar</Button></div></label>} />
+              <label className="md:col-span-2">Logradouro<Input {...register("street")} /></label>
+              <label>Numero<Input {...register("number")} /></label>
+              <label>Bairro<Input {...register("district")} /></label>
+              <label className="md:col-span-2">Cidade<Input {...register("city")} /></label>
+              <label>Estado<Input maxLength={2} {...register("state")} /></label>
+            </fieldset>
+          )}
 
-      {activeTab === "commercial" && (
-        <fieldset className="grid gap-4 md:grid-cols-3">
+          {activeTab === "commercial" && (
+            <fieldset className="grid gap-4 md:grid-cols-3 xl:grid-cols-4">
           <label>Categoria<select className={selectClass} {...register("categoryId")}><option value="">Sem categoria</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
           <label>Origem<Input placeholder="Site, indicacao, campanha..." {...register("source")} /></label>
           <label>Responsavel<Input {...register("responsible")} /></label>
@@ -452,40 +509,42 @@ export function ClientForm({ client, onSave, onCancel }: { client?: Client; onSa
           <label>Primeira compra<Input type="date" {...register("firstPurchaseAt")} /></label>
           <label>Ultima compra<Input type="date" {...register("lastPurchaseAt")} /></label>
           <label>Proximo follow-up<Input type="date" {...register("nextFollowUpAt")} /></label>
-          <label className="md:col-span-3">Observacoes<Textarea {...register("observations")} /></label>
-        </fieldset>
-      )}
+              <label className="md:col-span-3 xl:col-span-4">Observacoes<Textarea {...register("observations")} /></label>
+            </fieldset>
+          )}
 
-      {activeTab === "financial" && (
-        <fieldset className="grid gap-4 md:grid-cols-3">
+          {activeTab === "financial" && (
+            <fieldset className="grid gap-4 md:grid-cols-3">
           <Controller control={control} name="creditLimit" render={({ field }) => <label>Limite de credito<CurrencyInput value={field.value} onChange={field.onChange} /></label>} />
           <label>Condicao de pagamento<Input placeholder="Ex: 30 dias, 2x boleto" {...register("paymentTerms")} /></label>
           <label>Forma preferencial<select className={selectClass} {...register("preferredPaymentMethod")}><option value="">Selecione</option><option value="PIX">PIX</option><option value="BOLETO">Boleto</option><option value="CREDIT_CARD">Cartao de credito</option><option value="TRANSFER">Transferencia</option></select></label>
           <label>Dia de vencimento<Input type="number" min={1} max={31} {...register("billingDay")} /></label>
           <label>Status financeiro<select className={selectClass} {...register("financialStatus")}><option value="REGULAR">Regular</option><option value="OVERDUE">Em atraso</option><option value="BLOCKED">Bloqueado</option><option value="REVIEW">Em analise</option></select></label>
-          <label className="md:col-span-3">Observacoes financeiras<Textarea {...register("financialNotes")} /></label>
-        </fieldset>
-      )}
+              <label className="md:col-span-3">Observacoes financeiras<Textarea {...register("financialNotes")} /></label>
+            </fieldset>
+          )}
 
-      {activeTab === "projects" && (
-        <fieldset className="grid gap-4">
-          <label>Vincular a projetos<select multiple className="min-h-56 w-full rounded-xl border border-slate-700 bg-sidebar px-3 py-2 text-sm" {...register("projectIds")}>{projects.map((project) => <option key={project.id} value={project.id}>{project.code} - {project.name}</option>)}</select></label>
-        </fieldset>
-      )}
+          {activeTab === "projects" && (
+            <fieldset className="grid gap-4">
+              <label>Vincular a projetos<select multiple className="min-h-56 w-full rounded-xl border border-slate-700 bg-sidebar px-3 py-2 text-sm" {...register("projectIds")}>{projects.map((project) => <option key={project.id} value={project.id}>{project.code} - {project.name}</option>)}</select></label>
+            </fieldset>
+          )}
 
-      {activeTab === "lgpd" && (
-        <fieldset className="grid gap-4 md:grid-cols-2">
-          <label>Data do consentimento<Input type="date" {...register("consentDate")} /></label>
-          <div className="rounded-xl border border-slate-700 bg-sidebar p-4">
-            <p className="mb-3 text-sm font-medium">Preferencias de comunicacao</p>
-            <label className="mb-3 flex items-center gap-3 text-sm"><input type="checkbox" {...register("allowEmailMarketing")} /> Permite e-mail marketing</label>
-            <label className="mb-3 flex items-center gap-3 text-sm"><input type="checkbox" {...register("allowWhatsapp")} /> Permite WhatsApp</label>
-            <label className="flex items-center gap-3 text-sm"><input type="checkbox" {...register("allowCalls")} /> Permite ligacao</label>
-          </div>
-        </fieldset>
-      )}
+          {activeTab === "lgpd" && (
+            <fieldset className="grid gap-4 md:grid-cols-2">
+              <label>Data do consentimento<Input type="date" {...register("consentDate")} /></label>
+              <div className="rounded-xl border border-slate-700 bg-sidebar p-4">
+                <p className="mb-3 text-sm font-medium">Preferencias de comunicacao</p>
+                <label className="mb-3 flex items-center gap-3 text-sm"><input type="checkbox" {...register("allowEmailMarketing")} /> Permite e-mail marketing</label>
+                <label className="mb-3 flex items-center gap-3 text-sm"><input type="checkbox" {...register("allowWhatsapp")} /> Permite WhatsApp</label>
+                <label className="flex items-center gap-3 text-sm"><input type="checkbox" {...register("allowCalls")} /> Permite ligacao</label>
+              </div>
+            </fieldset>
+          )}
+        </section>
+      </div>
 
-      <div className="flex justify-end gap-3 border-t border-slate-700 pt-4"><Button variant="ghost" type="button" onClick={onCancel}>Cancelar</Button><Button disabled={isSubmitting}>{isSubmitting ? "Salvando..." : "Salvar cliente"}</Button></div>
+      <div className="flex justify-end gap-3 border-t border-slate-700 pt-4"><Button variant="ghost" type="button" onClick={onCancel}>Cancelar</Button><Button type="submit" disabled={isSubmitting}>{isSubmitting ? "Salvando..." : "Salvar cliente"}</Button></div>
     </form>
   );
 }

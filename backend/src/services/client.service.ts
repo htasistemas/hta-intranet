@@ -1,10 +1,11 @@
 import type { z } from "zod";
-import type { ClientStatus } from "@prisma/client";
+import type { ClientStatus, Priority } from "@prisma/client";
 import { ClientRepository } from "../repositories/client.repository.js";
 import { AuditRepository } from "../repositories/audit.repository.js";
 import { clientSchema } from "../validations/entities.validation.js";
 import type { ListQuery } from "../utils/pagination.js";
 import { ApiError } from "../utils/api-error.js";
+import { prisma } from "../prisma/client.js";
 
 type ClientInput = z.infer<typeof clientSchema>;
 
@@ -18,6 +19,11 @@ interface ClientImportResult {
   created: number;
   failed: number;
   errors: ClientImportRowError[];
+}
+
+function priorityValue(priority: string | null | undefined): Priority {
+  if (priority === "LOW" || priority === "HIGH" || priority === "URGENT") return priority;
+  return "MEDIUM";
 }
 
 export class ClientService {
@@ -105,5 +111,57 @@ export class ClientService {
     await this.get(id, userId);
     await this.auditRepository.log({ userId, clientId: id, entity: "Client", entityId: id, action: "DELETED" });
     await this.repository.delete(id);
+  }
+
+  public async moveToProspecting(id: string, userId: string) {
+    const client = await this.get(id, userId);
+    return prisma.$transaction(async (tx) => {
+      const existingLead = client.document
+        ? await tx.crmLead.findFirst({ where: { ownerId: userId, document: client.document, deletedAt: null, convertedAt: null } })
+        : client.email
+          ? await tx.crmLead.findFirst({ where: { ownerId: userId, email: client.email, deletedAt: null, convertedAt: null } })
+          : null;
+      const leadData = {
+        tenantId: "default",
+        ownerId: userId,
+        name: client.name,
+        company: client.legalName ?? client.tradeName,
+        document: client.document,
+        segment: client.segment,
+        email: client.email,
+        phone: client.phone,
+        whatsapp: client.whatsapp,
+        postalCode: client.postalCode,
+        street: client.street,
+        number: client.number,
+        district: client.district,
+        city: client.city,
+        state: client.state,
+        source: client.source,
+        responsible: client.responsible ?? "Comercial",
+        estimatedValue: client.expectedValue,
+        observations: client.observations,
+        priority: priorityValue(client.priority),
+        status: "NEW" as const,
+        stage: "LEAD_RECEIVED" as const,
+        convertedAt: null,
+        wonAt: null
+      };
+      const lead = existingLead
+        ? await tx.crmLead.update({ where: { id: existingLead.id }, data: leadData })
+        : await tx.crmLead.create({ data: leadData });
+      const updatedClient = await tx.client.update({ where: { id }, data: { status: "PROSPECT" } });
+      await tx.auditLog.create({
+        data: {
+          userId,
+          clientId: updatedClient.id,
+          entity: "Client",
+          entityId: updatedClient.id,
+          action: "UPDATED",
+          changes: { status: "PROSPECT", source: "moveToProspecting", leadId: lead.id }
+        }
+      });
+      return lead;
+    });
   }
 }

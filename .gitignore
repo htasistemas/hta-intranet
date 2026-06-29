@@ -36,6 +36,8 @@ node_modules/
 dist/
 .env
 *.log
+*.dump
+backups/
 coverage/
 frontend/.vite/
 .runtime/

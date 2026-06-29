@@ -152,7 +152,7 @@ export class CrmService {
   public async leadCities(ownerId: string): Promise<Array<{ city: string; state: string; total: number }>> {
     const cities = await prisma.crmLead.groupBy({
       by: ["city", "state"],
-      where: { ...scope(ownerId), deletedAt: null, city: { not: null } },
+      where: { ...scope(ownerId), deletedAt: null, convertedAt: null, city: { not: null } },
       _count: { _all: true },
       orderBy: { _count: { city: "desc" } }
     });
@@ -162,10 +162,10 @@ export class CrmService {
   public async leadStats(ownerId: string): Promise<{ total: number; open: number; qualified: number; estimatedTotal: number }> {
     const currentScope = scope(ownerId);
     const [total, open, qualified, aggregate] = await prisma.$transaction([
-      prisma.crmLead.count({ where: { ...currentScope, deletedAt: null } }),
-      prisma.crmLead.count({ where: { ...currentScope, deletedAt: null, status: { notIn: ["WON", "LOST"] } } }),
-      prisma.crmLead.count({ where: { ...currentScope, deletedAt: null, status: { in: ["QUALIFIED", "PROPOSAL_SENT", "NEGOTIATION"] } } }),
-      prisma.crmLead.aggregate({ where: { ...currentScope, deletedAt: null, status: { notIn: ["WON", "LOST"] } }, _sum: { estimatedValue: true } })
+      prisma.crmLead.count({ where: { ...currentScope, deletedAt: null, convertedAt: null } }),
+      prisma.crmLead.count({ where: { ...currentScope, deletedAt: null, convertedAt: null, status: { notIn: ["WON", "LOST"] } } }),
+      prisma.crmLead.count({ where: { ...currentScope, deletedAt: null, convertedAt: null, status: { in: ["QUALIFIED", "PROPOSAL_SENT", "NEGOTIATION"] } } }),
+      prisma.crmLead.aggregate({ where: { ...currentScope, deletedAt: null, convertedAt: null, status: { notIn: ["WON", "LOST"] } }, _sum: { estimatedValue: true } })
     ]);
     return { total, open, qualified, estimatedTotal: Number(aggregate._sum.estimatedValue ?? 0) };
   }
@@ -519,6 +519,87 @@ export class CrmService {
           responsible: lead.responsible,
           completedAt: new Date(),
           metadata: { contractId: contract.id, serviceOrder: contract.serviceOrder }
+        }
+      });
+      return client;
+    });
+  }
+
+  public async activateLeadAsClient(id: string, ownerId: string) {
+    const lead = await this.getLead(id, ownerId);
+    const email = normalizeEmail(lead.email);
+    const existingClient = lead.document
+      ? await prisma.client.findUnique({ where: { document: lead.document } })
+      : email
+        ? await prisma.client.findFirst({ where: { ownerId, email } })
+        : null;
+    if (existingClient && existingClient.ownerId !== ownerId) {
+      throw new ApiError(409, "Ja existe um cliente com este documento em outro cadastro.");
+    }
+
+    const data = {
+      ownerId,
+      name: lead.name,
+      document: lead.document,
+      type: lead.document && lead.document.replace(/\D/g, "").length > 11 ? "COMPANY" as const : "INDIVIDUAL" as const,
+      legalName: lead.company,
+      tradeName: lead.company,
+      email,
+      phone: lead.phone,
+      whatsapp: lead.whatsapp,
+      postalCode: lead.postalCode,
+      street: lead.street,
+      number: lead.number,
+      district: lead.district,
+      city: lead.city,
+      state: lead.state,
+      observations: lead.observations,
+      status: "ACTIVE" as const,
+      source: lead.source,
+      segment: lead.segment,
+      responsible: lead.responsible,
+      priority: lead.priority,
+      temperature: lead.score,
+      expectedValue: lead.estimatedValue,
+      nextFollowUpAt: lead.nextFollowUpAt
+    } satisfies Prisma.ClientUncheckedCreateInput;
+
+    return prisma.$transaction(async (tx) => {
+      const updateData: Prisma.ClientUncheckedUpdateInput = { ...data };
+      delete updateData.ownerId;
+      const client = existingClient
+        ? await tx.client.update({ where: { id: existingClient.id }, data: updateData })
+        : await tx.client.create({ data });
+      await tx.crmLead.update({
+        where: { id },
+        data: {
+          status: "WON",
+          stage: "SALE_COMPLETED",
+          convertedAt: new Date(),
+          wonAt: lead.wonAt ?? new Date()
+        }
+      });
+      await tx.auditLog.create({
+        data: {
+          userId: ownerId,
+          clientId: client.id,
+          entity: "Client",
+          entityId: client.id,
+          action: existingClient ? "UPDATED" : "CREATED",
+          changes: { source: "crmLead", leadId: id }
+        }
+      });
+      await tx.crmActivity.create({
+        data: {
+          tenantId: scope(ownerId).tenantId,
+          ownerId,
+          leadId: id,
+          type: "STATUS_CHANGE" satisfies CrmActivityType,
+          status: "COMPLETED",
+          title: "Captacao convertida em cliente ativo",
+          responsible: lead.responsible,
+          completedAt: new Date(),
+          metadata: { clientId: client.id }
         }
       });
       return client;

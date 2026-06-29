@@ -40,6 +40,9 @@ export class ClientController {
     await this.service.delete(resourceId(request), userId(request));
     response.status(204).send();
   };
+  public moveToProspecting = async (request: Request, response: Response): Promise<void> => {
+    response.json(await this.service.moveToProspecting(resourceId(request), userId(request)));
+  };
 }
 
 export class ScheduleController {
