@@ -41,3 +41,7 @@ backups/
 coverage/
 frontend/.vite/
 .runtime/
+.env.*
+!.env.*.example
+
+actions-runner/

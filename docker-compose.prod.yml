@@ -1,3 +1,5 @@
+name: intranet-hta
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -32,6 +34,12 @@ services:
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN}
+    healthcheck:
+      test: ["CMD", "node", "-e", "require(\x27http\x27).get(\x27http://localhost:3333/health\x27,res=>process.exit(res.statusCode===200?0:1)).on(\x27error\x27,()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
 
   frontend:
     build:
@@ -42,9 +50,16 @@ services:
     container_name: hta-intranet-frontend
     restart: unless-stopped
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
       - "127.0.0.1:8081:80"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
 
 volumes:
   hta_intranet_postgres:

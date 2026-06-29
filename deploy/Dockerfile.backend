@@ -9,6 +9,7 @@ RUN npm ci
 
 COPY backend backend
 
+ENV DATABASE_URL=postgresql://u:p@localhost:5432/db
 RUN npm run prisma:generate -w backend
 RUN npm run build -w backend
 

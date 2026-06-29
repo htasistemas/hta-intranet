@@ -1,0 +1,66 @@
+name: Deploy de producao
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-producao
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Atualizar intranet.htasistemas.com.br
+    runs-on:
+      - self-hosted
+      - hta-intranet
+    timeout-minutes: 20
+
+    steps:
+      - name: Atualizar checkout de producao
+        working-directory: /home/srv/hta-intranet
+        run: |
+          set -euo pipefail
+          git fetch origin master
+          git checkout master
+          git merge --ff-only origin/master
+
+      - name: Validar configuracao
+        working-directory: /home/srv/hta-intranet
+        run: |
+          set -euo pipefail
+          test -s .env.production
+          docker compose \
+            --env-file .env.production \
+            -f docker-compose.prod.yml \
+            config --quiet
+
+      - name: Construir e atualizar servicos
+        working-directory: /home/srv/hta-intranet
+        run: |
+          set -euo pipefail
+          docker compose \
+            --env-file .env.production \
+            -f docker-compose.prod.yml \
+            up -d --build --remove-orphans --wait --wait-timeout 180
+
+      - name: Aplicar migrations
+        working-directory: /home/srv/hta-intranet
+        run: |
+          set -euo pipefail
+          docker compose \
+            --env-file .env.production \
+            -f docker-compose.prod.yml \
+            exec -T backend npm exec -w backend prisma migrate deploy
+
+      - name: Validar deploy
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error \
+            --retry 10 --retry-delay 3 --retry-all-errors \
+            http://127.0.0.1:8081/health

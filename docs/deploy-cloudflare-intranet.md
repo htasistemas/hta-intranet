@@ -12,8 +12,8 @@ Instale Docker e Docker Compose no servidor Linux e libere as portas:
 Clone o repositorio:
 
 ```bash
-git clone git@github.com:htasistemas/hta-intranet.git
-cd hta-intranet
+git clone git@github.com:htasistemas/hta-intranet.git /home/srv/hta-intranet
+cd /home/srv/hta-intranet
 cp .env.production.example .env.production
 ```
 
@@ -23,7 +23,7 @@ Suba os containers:
 
 ```bash
 docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
-docker compose --env-file .env.production -f docker-compose.prod.yml exec backend npm run db:migrate
+docker compose --env-file .env.production -f docker-compose.prod.yml exec -T backend npm exec -w backend prisma migrate deploy
 docker compose --env-file .env.production -f docker-compose.prod.yml exec backend npm run db:seed
 ```
 
@@ -115,7 +115,14 @@ https://intranet.htasistemas.com.br/health
 ## 6. Atualizacao
 
 ```bash
-git pull
+cd /home/srv/hta-intranet
+git pull --ff-only
 docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
-docker compose --env-file .env.production -f docker-compose.prod.yml exec backend npm run db:migrate
+docker compose --env-file .env.production -f docker-compose.prod.yml exec -T backend npm exec -w backend prisma migrate deploy
 ```
+
+## 7. Deploy automatico pelo GitHub
+
+O workflow `.github/workflows/deploy.yml` executa automaticamente a cada push na branch `master`. O servidor precisa ter um GitHub Actions Runner dedicado ao repositorio, executado pelo usuario `srv`, com os labels `self-hosted` e `hta-intranet`.
+
+O checkout de producao e o ambiente ficam em `/home/srv/hta-intranet` e `/home/srv/hta-intranet/.env.production`. O usuario do runner precisa ter acesso ao Docker sem `sudo`.
