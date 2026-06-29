@@ -15,7 +15,7 @@ type LoginFields = z.infer<typeof schema>;
 export default function LoginPage() {
   const { session, login } = useAuth();
   const { toast } = useToast();
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginFields>({ resolver: zodResolver(schema), defaultValues: { email: "adrianomtorresbr@gmail.com", password: "Admin@123" } });
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginFields>({ resolver: zodResolver(schema), defaultValues: { email: "", password: "" } });
   if (session) return <Navigate to="/" replace />;
   const onSubmit = async (values: LoginFields): Promise<void> => {
     try { await login(values.email, values.password); }
@@ -30,12 +30,11 @@ export default function LoginPage() {
             <span className="gradient-fill grid h-12 w-12 place-items-center rounded-2xl"><Sparkles /></span>
             <div><h1 className="text-xl font-bold">HTA <span className="gradient-text">Sistemas</span></h1><p className="text-sm text-slate-400">Entre na sua central de gestao</p></div>
           </div>
-          <form className="space-y-5" onSubmit={handleSubmit(onSubmit)}>
-            <label className="block text-sm text-slate-300">Email<Input className="mt-2" type="email" {...register("email")} />{errors.email && <small className="text-red-400">{errors.email.message}</small>}</label>
-            <label className="block text-sm text-slate-300">Senha<Input className="mt-2" type="password" {...register("password")} />{errors.password && <small className="text-red-400">{errors.password.message}</small>}</label>
+          <form className="space-y-5" onSubmit={handleSubmit(onSubmit)} autoComplete="off">
+            <label className="block text-sm text-slate-300">Email<Input className="mt-2" type="email" autoComplete="off" {...register("email")} />{errors.email && <small className="text-red-400">{errors.email.message}</small>}</label>
+            <label className="block text-sm text-slate-300">Senha<Input className="mt-2" type="password" autoComplete="new-password" {...register("password")} />{errors.password && <small className="text-red-400">{errors.password.message}</small>}</label>
             <Button className="w-full" disabled={isSubmitting}>{isSubmitting ? "Entrando..." : "Entrar"}</Button>
           </form>
-          <p className="mt-6 rounded-xl bg-sidebar p-3 text-xs text-slate-400">Conta administradora configurada: adrianomtorresbr@gmail.com</p>
         </div>
         <img className="hidden h-full min-h-[520px] w-full object-cover object-center opacity-90 lg:block" src="/assets/login-hero.png" alt="" aria-hidden="true" />
       </Card>

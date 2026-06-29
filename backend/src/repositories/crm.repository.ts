@@ -53,12 +53,12 @@ export class CrmRepository {
       ...(filters.priority ? { priority: filters.priority } : {}),
       ...(query.search ? {
         OR: [
-          { name: { contains: query.search, mode: "insensitive" } },
-          { company: { contains: query.search, mode: "insensitive" } },
-          { document: { contains: query.search } },
-          { email: { contains: query.search, mode: "insensitive" } },
-          { city: { contains: query.search, mode: "insensitive" } },
-          { state: { contains: query.search, mode: "insensitive" } }
+          { name: { startsWith: query.search, mode: "insensitive" } },
+          { company: { startsWith: query.search, mode: "insensitive" } },
+          { document: { startsWith: query.search } },
+          { email: { startsWith: query.search, mode: "insensitive" } },
+          { city: { startsWith: query.search, mode: "insensitive" } },
+          { state: { startsWith: query.search, mode: "insensitive" } }
         ]
       } : {})
     };
