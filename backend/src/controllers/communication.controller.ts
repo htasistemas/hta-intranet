@@ -31,6 +31,15 @@ export class CommunicationController {
     response.status(201).json(await this.service.saveTemplate(userId(request), request.body));
   };
 
+  public updateTemplate = async (request: Request, response: Response): Promise<void> => {
+    response.json(await this.service.updateTemplate(userId(request), resourceId(request), request.body));
+  };
+
+  public deleteTemplate = async (request: Request, response: Response): Promise<void> => {
+    await this.service.deleteTemplate(userId(request), resourceId(request));
+    response.status(204).send();
+  };
+
   public messages = async (request: Request, response: Response): Promise<void> => {
     const query = z.object({ clientId: z.string().optional(), leadId: z.string().optional() }).parse(request.query);
     response.json(await this.service.listMessages(userId(request), query.clientId, query.leadId));

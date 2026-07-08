@@ -224,6 +224,17 @@ export interface CommunicationMessage {
   client?: CrmClient | null;
   lead?: CrmLead | null;
   template?: CommunicationTemplate | null;
+  webhookEvents?: CommunicationWebhookEvent[];
+}
+
+export interface CommunicationWebhookEvent {
+  id: string;
+  channel: CommunicationChannel;
+  provider: CommunicationProvider | null;
+  providerMessageId: string | null;
+  status: CommunicationStatus | null;
+  payload: Record<string, unknown>;
+  receivedAt: string;
 }
 
 export interface CommunicationCampaign {

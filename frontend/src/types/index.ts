@@ -162,6 +162,7 @@ export interface DashboardData {
   kpis: {
     total: number;
     active: number;
+    prospects: number;
     inactive: number;
     todayAppointments: number;
     weekAppointments: number;

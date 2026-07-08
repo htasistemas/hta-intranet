@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
-  BarChart3,
   CalendarDays,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  CircleDot,
   ClipboardList,
   ContactRound,
   DatabaseBackup,
@@ -14,12 +14,13 @@ import {
   FileBarChart,
   FolderKanban,
   LogOut,
+  Mail,
   Menu,
   Package,
   Search,
   Settings,
   Sparkles,
-  Target,
+  LayoutDashboard,
   UserCog,
   X,
   type LucideIcon
@@ -37,28 +38,42 @@ interface NavigationItem {
 
 interface NavigationGroup {
   title: string;
+  icon: LucideIcon;
   items: NavigationItem[];
 }
 
 const navigation: NavigationGroup[] = [
-  { title: "Visao Geral", items: [{ label: "Dashboard", href: "/", icon: BarChart3 }] },
   {
-    title: "Controle Empresarial",
+    title: "Dashboard",
+    icon: LayoutDashboard,
+    items: [{ label: "Dashboard", href: "/", icon: LayoutDashboard }]
+  },
+  {
+    title: "Cadastro",
+    icon: ContactRound,
+    items: [
+      { label: "Clientes ativos", href: "/clientes-ativos", icon: ContactRound },
+      { label: "Captacao", href: "/captacao", icon: CircleDot },
+      { label: "Produtos", href: "/produtos", icon: Package },
+      { label: "Mensagens", href: "/mensagens", icon: Mail },
+      { label: "Projetos", href: "/projetos", icon: FolderKanban }
+    ]
+  },
+  {
+    title: "Operacao",
+    icon: CalendarDays,
     items: [
       { label: "Agenda Profissional", href: "/agenda", icon: CalendarDays },
       { label: "Gestao Pessoal", href: "/tarefas", icon: ClipboardList },
       { label: "CRM Comercial", href: "/crm-comercial", icon: Handshake },
       { label: "Portal Cliente", href: "/portal-cliente", icon: PanelsTopLeft },
-      { label: "Clientes ativos", href: "/clientes", icon: ContactRound },
-      { label: "Captacao", href: "/captacao", icon: Target },
-      { label: "Produtos", href: "/produtos", icon: Package },
-      { label: "Projetos", href: "/projetos", icon: FolderKanban }
+      { label: "Relatorios", href: "/relatorios", icon: FileBarChart }
     ]
   },
   {
-    title: "Sistema",
+    title: "Configuracoes",
+    icon: Settings,
     items: [
-      { label: "Relatorios", href: "/relatorios", icon: FileBarChart },
       { label: "Usuarios", href: "/usuarios", icon: UserCog },
       { label: "Backup e restauracao", href: "/backup-restauracao", icon: DatabaseBackup },
       { label: "Configuracoes", href: "/configuracoes", icon: Settings }
@@ -67,7 +82,7 @@ const navigation: NavigationGroup[] = [
 ];
 
 const sidebarStorageKey = "htasistemas.sidebar.collapsed";
-const routeTitles: Record<string, string> = { "/calculadora": "Calculadora", "/usuarios": "Usuarios" };
+const routeTitles: Record<string, string> = { "/": "Dashboard", "/calculadora": "Calculadora", "/clientes": "Clientes" };
 
 function groupsInitiallyOpen(): Record<string, boolean> {
   return Object.fromEntries(navigation.map((group) => [group.title, true]));
@@ -104,7 +119,7 @@ export function AppLayout() {
     return () => window.removeEventListener("keydown", handleShortcut);
   }, [navigate]);
 
-  function toggleGroup(groupTitle: string) {
+  function toggleGroup(groupTitle: string): void {
     setExpandedGroups((current) => ({ ...current, [groupTitle]: !current[groupTitle] }));
   }
 
@@ -140,21 +155,26 @@ export function AppLayout() {
         <nav className={cn("flex-1 space-y-3 overflow-y-auto p-4", collapsed && "lg:px-3")}>
           {navigation.map((group) => {
             const expanded = expandedGroups[group.title];
+            const GroupIcon = group.icon;
             return (
               <section key={group.title} className={cn(collapsed && "lg:border-b lg:border-slate-700/60 lg:pb-3")}>
                 <button
                   type="button"
                   onClick={() => toggleGroup(group.title)}
                   aria-expanded={expanded}
+                  title={collapsed ? group.title : undefined}
                   className={cn(
-                    "mb-1 flex w-full items-center justify-between rounded-lg px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 transition hover:bg-white/5 hover:text-slate-300",
-                    collapsed && "lg:hidden"
+                    "mb-1 flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-300 transition hover:bg-white/5 hover:text-white",
+                    collapsed && "lg:justify-center lg:px-0"
                   )}
                 >
-                  <span>{group.title}</span>
-                  <ChevronDown size={14} className={cn("transition-transform", !expanded && "-rotate-90")} />
+                  <span className="flex min-w-0 items-center gap-3">
+                    <GroupIcon className="shrink-0" size={18} />
+                    <span className={cn("truncate", collapsed && "lg:hidden")}>{group.title}</span>
+                  </span>
+                  <ChevronDown size={15} className={cn("transition-transform", !expanded && "-rotate-90", collapsed && "lg:hidden")} />
                 </button>
-                <div className={cn("space-y-1", !expanded && "hidden", collapsed && "lg:block")}>
+                <div className={cn("space-y-1 pl-4", !expanded && "hidden", collapsed && "lg:block lg:pl-0")}>
                   {group.items.map(({ label, href, icon: Icon }) => (
                     <NavLink
                       key={href}
@@ -163,13 +183,13 @@ export function AppLayout() {
                       onClick={() => setMobileOpened(false)}
                       className={({ isActive }) =>
                         cn(
-                          "flex items-center gap-3 rounded-xl px-4 py-3 text-sm transition",
+                          "flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm transition",
                           collapsed && "lg:justify-center lg:px-0",
                           isActive ? "gradient-fill text-white" : "text-slate-400 hover:bg-white/5 hover:text-white"
                         )
                       }
                     >
-                      <Icon className="shrink-0" size={19} />
+                      <Icon className="shrink-0" size={18} />
                       <span className={cn(collapsed && "lg:hidden")}>{label}</span>
                     </NavLink>
                   ))}

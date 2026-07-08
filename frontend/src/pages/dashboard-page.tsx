@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { CalendarCheck, Cake, CircleDollarSign, Contact, ContactRound, ListTodo, UserCheck, UserX } from "lucide-react";
+import { CalendarCheck, Cake, CircleDollarSign, Contact, ContactRound, ListTodo, Target, UserCheck, UserX } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "@/services/api";
 import type { DashboardData } from "@/types";
@@ -14,6 +14,7 @@ export default function DashboardPage() {
   const cards = [
     ["Total de clientes", data.kpis.total, ContactRound, "Base cadastrada"],
     ["Clientes ativos", data.kpis.active, UserCheck, "Relacionamentos ativos"],
+    ["Captacao", data.kpis.prospects, Target, "Prospects em andamento"],
     ["Clientes inativos", data.kpis.inactive, UserX, "Precisam de atencao"],
     ["Compromissos hoje", data.kpis.todayAppointments, CalendarCheck, "Agenda de hoje"],
     ["Compromissos semana", data.kpis.weekAppointments, Contact, "Nesta semana"],

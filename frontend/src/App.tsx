@@ -12,6 +12,7 @@ const ProspectingPage = lazy(() => import("@/pages/prospecting-page"));
 const CustomerPortalPage = lazy(() => import("@/pages/customer-portal-page"));
 const ProductsPage = lazy(() => import("@/pages/products-page"));
 const ProjectsPage = lazy(() => import("@/pages/projects-page"));
+const MessagesPage = lazy(() => import("@/pages/messages-page"));
 const CalendarPage = lazy(() => import("@/pages/calendar-page"));
 const TasksPage = lazy(() => import("@/pages/tasks-page"));
 const CalculatorPage = lazy(() => import("@/pages/calculator-page"));
@@ -32,10 +33,12 @@ export default function App() {
           <Route path="/" element={<DashboardPage />} />
           <Route path="/crm-comercial" element={<CrmPage />} />
           <Route path="/clientes" element={<ClientsPage />} />
+          <Route path="/clientes-ativos" element={<ClientsPage />} />
           <Route path="/captacao" element={<ProspectingPage />} />
           <Route path="/portal-cliente" element={<CustomerPortalPage />} />
           <Route path="/produtos" element={<ProductsPage />} />
           <Route path="/projetos" element={<ProjectsPage />} />
+          <Route path="/mensagens" element={<MessagesPage />} />
           <Route path="/agenda" element={<CalendarPage />} />
           <Route path="/tarefas" element={<TasksPage />} />
           <Route path="/calculadora" element={<CalculatorPage />} />

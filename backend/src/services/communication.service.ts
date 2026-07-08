@@ -116,10 +116,22 @@ export class CommunicationService {
     return prisma.communicationTemplate.create({ data: { ...input, tenantId: scope(ownerId).tenantId, ownerId } });
   }
 
+  public async updateTemplate(ownerId: string, templateId: string, input: TemplateInput) {
+    const template = await prisma.communicationTemplate.findFirst({ where: { id: templateId, ...scope(ownerId), deletedAt: null } });
+    if (!template) throw new ApiError(404, "Template nao encontrado.");
+    return prisma.communicationTemplate.update({ where: { id: templateId }, data: input });
+  }
+
+  public async deleteTemplate(ownerId: string, templateId: string): Promise<void> {
+    const template = await prisma.communicationTemplate.findFirst({ where: { id: templateId, ...scope(ownerId), deletedAt: null } });
+    if (!template) throw new ApiError(404, "Template nao encontrado.");
+    await prisma.communicationTemplate.update({ where: { id: templateId }, data: { active: false, deletedAt: new Date() } });
+  }
+
   public listMessages(ownerId: string, clientId?: string, leadId?: string) {
     return prisma.communicationMessage.findMany({
       where: { ...scope(ownerId), deletedAt: null, ...(clientId ? { clientId } : {}), ...(leadId ? { leadId } : {}) },
-      include: { client: true, lead: true, template: true },
+      include: { client: true, lead: true, template: true, webhookEvents: { orderBy: { receivedAt: "desc" } } },
       orderBy: { createdAt: "desc" }
     });
   }

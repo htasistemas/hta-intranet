@@ -7,7 +7,9 @@ const includeRelations = {
   category: true,
   tags: { include: { tag: true } },
   contacts: true,
-  projectLinks: { include: { project: true } },
+  projects: { include: { product: true } },
+  projectLinks: { include: { project: { include: { product: true } } } },
+  products: { include: { product: true } },
   _count: { select: { schedules: true, tasks: true, notes: true, attachments: true } }
 } satisfies Prisma.ClientInclude;
 
@@ -20,7 +22,9 @@ export class ClientRepository {
         OR: [
           { name: { contains: query.search, mode: "insensitive" } },
           { document: { contains: query.search } },
-          { email: { contains: query.search, mode: "insensitive" } }
+          { email: { contains: query.search, mode: "insensitive" } },
+          { city: { contains: query.search, mode: "insensitive" } },
+          { state: { contains: query.search, mode: "insensitive" } }
         ]
       } : {})
     };

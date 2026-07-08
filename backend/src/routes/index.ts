@@ -170,6 +170,8 @@ apiRouter.get("/communication/provider-configs", asyncHandler(communication.prov
 apiRouter.post("/communication/provider-configs", validateBody(communicationProviderConfigSchema), asyncHandler(communication.createProviderConfig));
 apiRouter.get("/communication/templates", asyncHandler(communication.templates));
 apiRouter.post("/communication/templates", validateBody(communicationTemplateSchema), asyncHandler(communication.createTemplate));
+apiRouter.put("/communication/templates/:id", validateBody(communicationTemplateSchema), asyncHandler(communication.updateTemplate));
+apiRouter.delete("/communication/templates/:id", asyncHandler(communication.deleteTemplate));
 apiRouter.get("/communication/messages", asyncHandler(communication.messages));
 apiRouter.post("/communication/send", validateBody(communicationSendSchema), asyncHandler(communication.send));
 apiRouter.post("/communication/queue/process", asyncHandler(communication.processQueue));
