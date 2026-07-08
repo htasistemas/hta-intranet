@@ -28,13 +28,24 @@ const sendSchema = z.object({
   templateId: optionalText,
   clientId: optionalText,
   recipientName: optionalText,
-  recipient: z.string().trim().min(3, "Informe o destinatario."),
+  recipient: optionalText,
   subject: optionalText,
   body: z.string().trim().min(2, "Informe a mensagem.")
 });
 
 type TemplateForm = z.infer<typeof templateSchema>;
 type SendForm = z.infer<typeof sendSchema>;
+type SendMode = "single" | "selected" | "all";
+
+interface SendPayload extends SendForm {
+  recipient: string;
+  variables: Record<string, string>;
+}
+
+interface BatchResult {
+  sent: number;
+  skipped: number;
+}
 
 const selectClass = "h-11 w-full rounded-xl border border-slate-700 bg-sidebar px-3 text-sm text-foreground outline-none focus:border-accent";
 const statusLabels: Record<CommunicationStatus, string> = {
@@ -57,7 +68,7 @@ const statusClasses: Record<CommunicationStatus, string> = {
   FAILED: "bg-red-500/15 text-red-200",
   CANCELLED: "bg-slate-500/15 text-slate-300"
 };
-const variableOptions = ["cliente", "empresa", "email", "whatsapp", "cidade", "responsavel"];
+const variableOptions = ["cliente", "empresa", "contato", "email", "whatsapp", "cidade", "responsavel"];
 
 function variablesText(template: CommunicationTemplate): string {
   return template.variables.join(", ");
@@ -76,15 +87,20 @@ function templatePayload(input: TemplateForm): Omit<CommunicationTemplate, "id">
 
 function replaceVariables(value: string, client: Client | undefined): string {
   if (!client) return value;
-  const variables: Record<string, string> = {
+  return Object.entries(clientVariables(client)).reduce((text, [key, variable]) => text.replaceAll(`{{${key}}}`, variable), value);
+}
+
+function clientVariables(client: Client): Record<string, string> {
+  const contactName = client.responsible ?? "";
+  return {
     cliente: client.name,
     empresa: client.tradeName ?? client.legalName ?? client.name,
+    contato: contactName,
     email: client.email ?? "",
     whatsapp: client.whatsapp ?? "",
     cidade: client.city ?? "",
-    responsavel: client.responsible ?? ""
+    responsavel: contactName
   };
-  return Object.entries(variables).reduce((text, [key, variable]) => text.replaceAll(`{{${key}}}`, variable), value);
 }
 
 function recipientFor(channel: CommunicationChannel, client: Client | undefined): string {
@@ -106,11 +122,18 @@ function formatDate(value: string | null): string {
 
 export default function MessagesPage() {
   const [search, setSearch] = useState("");
+  const [sendMode, setSendMode] = useState<SendMode>("single");
+  const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<CommunicationTemplate | undefined>();
   const [templateToDelete, setTemplateToDelete] = useState<CommunicationTemplate | undefined>();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const clients = useQuery({ queryKey: ["message-clients", search], queryFn: () => api.get<PageResult<Client>>(`/clients?pageSize=50&search=${encodeURIComponent(search)}`) });
+  const clients = useQuery({
+    queryKey: ["message-clients", search],
+    queryFn: () => api.get<PageResult<Client>>(`/clients?pageSize=500&search=${encodeURIComponent(search)}`),
+    refetchOnMount: "always",
+    staleTime: 0
+  });
   const templates = useQuery({ queryKey: ["communication-templates"], queryFn: () => api.get<CommunicationTemplate[]>("/communication/templates") });
   const messages = useQuery({ queryKey: ["communication-messages"], queryFn: () => api.get<CommunicationMessage[]>("/communication/messages") });
   const report = useQuery({ queryKey: ["communication-report"], queryFn: () => api.get<CommunicationReport>("/communication/report") });
@@ -128,6 +151,7 @@ export default function MessagesPage() {
   const selectedSendTemplateId = useWatch({ control: sendForm.control, name: "templateId" });
   const clientList = clients.data?.data ?? [];
   const selectedClient = clientList.find((client) => client.id === selectedClientId);
+  const selectedClients = clientList.filter((client) => selectedClientIds.includes(client.id));
 
   const invalidate = (): void => {
     void queryClient.invalidateQueries({ queryKey: ["communication-templates"] });
@@ -158,11 +182,41 @@ export default function MessagesPage() {
     onError: (error) => toast(error.message, "error")
   });
   const sendMessage = useMutation({
-    mutationFn: (input: SendForm) => api.post<CommunicationMessage>("/communication/send", { ...input, variables: {} }),
+    mutationFn: (input: SendPayload) => api.post<CommunicationMessage>("/communication/send", input),
     onSuccess: () => {
       sendForm.reset({ channel: "EMAIL", recipient: "", subject: "", body: "Ola {{cliente}}, tudo bem?" });
       invalidate();
       toast("Mensagem enviada ou enfileirada.");
+    },
+    onError: (error) => toast(error.message, "error")
+  });
+  const sendBatchMessage = useMutation({
+    mutationFn: async (input: SendForm): Promise<BatchResult> => {
+      const targetClients = sendMode === "all" ? clientList : selectedClients;
+      let sent = 0;
+      let skipped = 0;
+      for (const client of targetClients) {
+        const recipient = recipientFor(input.channel, client);
+        if (!recipient) {
+          skipped += 1;
+          continue;
+        }
+        await api.post<CommunicationMessage>("/communication/send", {
+          channel: input.channel,
+          templateId: input.templateId,
+          recipientName: client.name,
+          recipient,
+          subject: replaceVariables(input.subject ?? "", client),
+          body: replaceVariables(input.body, client),
+          variables: clientVariables(client)
+        });
+        sent += 1;
+      }
+      return { sent, skipped };
+    },
+    onSuccess: (result) => {
+      invalidate();
+      toast(`${result.sent} mensagem(ns) enviada(s) ou enfileirada(s). ${result.skipped ? `${result.skipped} cliente(s) sem destinatario.` : ""}`.trim(), result.sent ? "success" : "error");
     },
     onError: (error) => toast(error.message, "error")
   });
@@ -176,12 +230,12 @@ export default function MessagesPage() {
   });
 
   useEffect(() => {
-    if (!selectedClient) return;
+    if (sendMode !== "single" || !selectedClient) return;
     sendForm.setValue("recipientName", selectedClient.name);
     sendForm.setValue("recipient", recipientFor(selectedChannel, selectedClient), { shouldValidate: true });
     sendForm.setValue("subject", replaceVariables(sendForm.getValues("subject") ?? "", selectedClient));
     sendForm.setValue("body", replaceVariables(sendForm.getValues("body"), selectedClient), { shouldValidate: true });
-  }, [selectedChannel, selectedClient, sendForm]);
+  }, [selectedChannel, selectedClient, sendForm, sendMode]);
 
   useEffect(() => {
     const template = templates.data?.find((item) => item.id === selectedSendTemplateId);
@@ -220,6 +274,32 @@ export default function MessagesPage() {
     templateForm.setValue("body", `${body} {{${variable}}}`, { shouldValidate: true });
   }
 
+  function handleInvalidTemplate(): void {
+    toast("Informe o nome e a mensagem antes de incluir.", "error");
+  }
+
+  function toggleSelectedClient(clientId: string): void {
+    setSelectedClientIds((current) => current.includes(clientId) ? current.filter((id) => id !== clientId) : [...current, clientId]);
+  }
+
+  async function submitSend(input: SendForm): Promise<void> {
+    if (sendMode === "single") {
+      const recipient = input.recipient?.trim() ?? "";
+      if (!recipient) {
+        toast("Informe o destinatario.", "error");
+        return;
+      }
+      await sendMessage.mutateAsync({ ...input, recipient, variables: selectedClient ? clientVariables(selectedClient) : {} });
+      return;
+    }
+    const targetCount = sendMode === "all" ? clientList.length : selectedClients.length;
+    if (!targetCount) {
+      toast(sendMode === "all" ? "Nenhum cliente carregado para envio." : "Selecione ao menos um cliente.", "error");
+      return;
+    }
+    await sendBatchMessage.mutateAsync(input);
+  }
+
   return (
     <div className="space-y-5">
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
@@ -233,20 +313,26 @@ export default function MessagesPage() {
       <section className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
         <Card>
           <CardTitle>{selectedTemplate ? "Editar mensagem criada" : "Criar mensagem"}</CardTitle>
-          <form className="grid gap-3" onSubmit={(event) => void templateForm.handleSubmit((input) => saveTemplate.mutateAsync(input).then(() => undefined))(event)}>
+          <form className="grid gap-3" onSubmit={(event) => void templateForm.handleSubmit((input) => saveTemplate.mutateAsync(input).then(() => undefined), handleInvalidTemplate)(event)}>
             <div className="grid gap-3 md:grid-cols-3">
-              <Input placeholder="Nome do modelo" {...templateForm.register("name")} />
+              <label>
+                <Input placeholder="Nome do modelo" {...templateForm.register("name")} />
+                {templateForm.formState.errors.name ? <small className="text-red-400">{templateForm.formState.errors.name.message}</small> : null}
+              </label>
               <select className={selectClass} {...templateForm.register("channel")}><option value="EMAIL">E-mail</option><option value="WHATSAPP">WhatsApp</option></select>
               <Input placeholder="Variaveis: cliente, empresa" {...templateForm.register("variablesText")} />
             </div>
             <Input placeholder="Assunto para e-mail" {...templateForm.register("subject")} />
-            <Textarea className="min-h-40" placeholder="Mensagem personalizada" {...templateForm.register("body")} />
+            <label>
+              <Textarea className="min-h-40" placeholder="Mensagem personalizada" {...templateForm.register("body")} />
+              {templateForm.formState.errors.body ? <small className="text-red-400">{templateForm.formState.errors.body.message}</small> : null}
+            </label>
             <div className="flex flex-wrap gap-2">
               {variableOptions.map((variable) => <Button key={variable} type="button" variant="outline" size="sm" onClick={() => insertVariable(variable)}><Plus size={14} /> {`{{${variable}}}`}</Button>)}
             </div>
             <div className="flex justify-between gap-3">
               <Button type="button" variant="ghost" onClick={() => { setSelectedTemplate(undefined); templateForm.reset(); }}>Limpar</Button>
-              <Button disabled={saveTemplate.isPending}><Save size={16} /> {selectedTemplate ? "Salvar edicao" : "Incluir mensagem"}</Button>
+              <Button type="submit" disabled={saveTemplate.isPending}><Save size={16} /> {selectedTemplate ? "Salvar edicao" : "Incluir mensagem"}</Button>
             </div>
           </form>
         </Card>
@@ -274,21 +360,46 @@ export default function MessagesPage() {
       <section className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
         <Card>
           <CardTitle>Enviar para cliente</CardTitle>
-          <form className="grid gap-3" onSubmit={(event) => void sendForm.handleSubmit((input) => sendMessage.mutateAsync(input).then(() => undefined))(event)}>
+          <form className="grid gap-3" onSubmit={(event) => void sendForm.handleSubmit((input) => submitSend(input))(event)}>
+            <div className="grid grid-cols-3 rounded-xl border border-slate-700 bg-sidebar p-1">
+              {([
+                ["single", "Um cliente"],
+                ["selected", "Selecionados"],
+                ["all", "Todos"]
+              ] as Array<[SendMode, string]>).map(([mode, label]) => (
+                <button key={mode} type="button" className={cn("h-10 rounded-lg px-2 text-sm text-slate-400 transition", sendMode === mode && "bg-accent/10 text-accent")} onClick={() => setSendMode(mode)} aria-pressed={sendMode === mode}>
+                  {label}
+                </button>
+              ))}
+            </div>
             <label className="relative">
               <Search className="absolute left-3 top-3 text-slate-500" size={18} />
               <Input className="pl-10" placeholder="Buscar cliente" value={search} onChange={(event) => setSearch(event.target.value)} />
             </label>
             <div className="grid gap-3 md:grid-cols-2">
-              <select className={selectClass} {...sendForm.register("clientId")}><option value="">Selecione o cliente</option>{clientList.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select>
+              {sendMode === "single" ? <select className={selectClass} {...sendForm.register("clientId")}><option value="">Selecione o cliente</option>{clientList.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select> : null}
               <select className={selectClass} {...sendForm.register("templateId")}><option value="">Mensagem criada</option>{templates.data?.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}</select>
               <select className={selectClass} {...sendForm.register("channel")}><option value="EMAIL">E-mail</option><option value="WHATSAPP">WhatsApp</option></select>
-              <Input placeholder="Destinatario" {...sendForm.register("recipient")} />
+              {sendMode === "single" ? <Input placeholder="Destinatario" {...sendForm.register("recipient")} /> : null}
             </div>
-            <Input placeholder="Nome do destinatario" {...sendForm.register("recipientName")} />
+            {sendMode === "single" ? <Input placeholder="Nome do destinatario" {...sendForm.register("recipientName")} /> : null}
+            {sendMode === "selected" ? (
+              <div className="max-h-52 overflow-y-auto rounded-xl border border-slate-700 bg-sidebar">
+                {clientList.map((client) => (
+                  <label key={client.id} className="flex cursor-pointer items-start gap-3 border-b border-slate-700/60 px-3 py-3 last:border-0 hover:bg-white/[.03]">
+                    <input type="checkbox" className="mt-1 h-4 w-4 rounded border-slate-600 bg-card accent-accent" checked={selectedClientIds.includes(client.id)} onChange={() => toggleSelectedClient(client.id)} />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium">{client.name}</span>
+                      <span className="block text-xs text-slate-400">{selectedChannel === "EMAIL" ? client.email ?? "Sem e-mail" : client.whatsapp ?? client.phone ?? "Sem WhatsApp/telefone"}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            ) : null}
+            {sendMode === "all" ? <p className="rounded-xl border border-slate-700 bg-sidebar px-3 py-2 text-sm text-slate-300">Sera enviado para todos os {clientList.length} cliente(s) carregado(s) na busca atual.</p> : null}
             <Input placeholder="Assunto" {...sendForm.register("subject")} />
             <Textarea className="min-h-40" placeholder="Mensagem final personalizada" {...sendForm.register("body")} />
-            <Button disabled={sendMessage.isPending}><Send size={16} /> Enviar mensagem</Button>
+            <Button disabled={sendMessage.isPending || sendBatchMessage.isPending}><Send size={16} /> {sendMode === "single" ? "Enviar mensagem" : "Enviar mensagens"}</Button>
           </form>
         </Card>
 

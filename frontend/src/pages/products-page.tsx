@@ -142,9 +142,9 @@ function ProductForm({ product, onSave, onCancel }: { product?: ProductService; 
     margin: fields.margin ? Number(fields.margin) : null
   });
   return (
-    <form className="grid gap-4 md:grid-cols-3" onSubmit={handleSubmit(submit)}>
+    <form className="grid gap-4 md:grid-cols-3 xl:grid-cols-4" onSubmit={handleSubmit(submit)}>
       <label>Codigo<Input {...register("code")} />{errors.code && <small className="text-red-400">{errors.code.message}</small>}</label>
-      <label className="md:col-span-2">Nome<Input {...register("name")} />{errors.name && <small className="text-red-400">{errors.name.message}</small>}</label>
+      <label className="md:col-span-2 xl:col-span-3">Nome<Input {...register("name")} />{errors.name && <small className="text-red-400">{errors.name.message}</small>}</label>
       <label>Tipo<select className={selectClass} {...register("type")}><option value="PRODUCT">Produto</option><option value="SERVICE">Servico</option><option value="SUBSCRIPTION">Assinatura</option><option value="LICENSE">Licenca</option><option value="PROJECT">Projeto</option></select></label>
       <label>Categoria<Input {...register("category")} /></label>
       <label>Status<select className={selectClass} {...register("status")}><option value="ACTIVE">Ativo</option><option value="INACTIVE">Inativo</option></select></label>
@@ -155,10 +155,10 @@ function ProductForm({ product, onSave, onCancel }: { product?: ProductService; 
       <label>SLA padrao<Input {...register("sla")} /></label>
       <label>Prazo de entrega<Input {...register("deliveryTime")} /></label>
       <label>Responsavel tecnico<Input {...register("technicalOwner")} /></label>
-      <label className="md:col-span-3">Descricao comercial<Textarea {...register("commercialDescription")} /></label>
-      <label className="md:col-span-3">Descricao tecnica<Textarea {...register("technicalDescription")} /></label>
-      <label className="md:col-span-3">Observacoes fiscais<Textarea {...register("fiscalNotes")} /></label>
-      <div className="flex justify-end gap-3 md:col-span-3"><Button type="button" variant="ghost" onClick={onCancel}>Cancelar</Button><Button disabled={isSubmitting}>{isSubmitting ? "Salvando..." : "Salvar produto"}</Button></div>
+      <label className="md:col-span-3 xl:col-span-2">Descricao comercial<Textarea {...register("commercialDescription")} /></label>
+      <label className="md:col-span-3 xl:col-span-2">Descricao tecnica<Textarea {...register("technicalDescription")} /></label>
+      <label className="md:col-span-3 xl:col-span-4">Observacoes fiscais<Textarea {...register("fiscalNotes")} /></label>
+      <div className="flex justify-end gap-3 md:col-span-3 xl:col-span-4"><Button type="button" variant="ghost" onClick={onCancel}>Cancelar</Button><Button disabled={isSubmitting}>{isSubmitting ? "Salvando..." : "Salvar produto"}</Button></div>
     </form>
   );
 }
@@ -312,7 +312,7 @@ export default function ProductsPage() {
           ))}
         </Card>
       </section>
-      <Dialog open={productDialogOpen} title={selectedProduct ? "Editar produto/servico" : "Novo produto/servico"} onClose={closeProductForm}>
+      <Dialog open={productDialogOpen} title={selectedProduct ? "Editar produto/servico" : "Novo produto/servico"} onClose={closeProductForm} className="max-w-[96vw] xl:max-w-6xl">
         <ProductForm product={selectedProduct} onCancel={closeProductForm} onSave={(input) => saveProduct.mutateAsync(input).then(() => undefined)} />
       </Dialog>
       <Dialog open={contractDialogOpen} title={selectedContract ? "Editar produto contratado" : "Vincular produto ao cliente"} onClose={() => setContractDialogOpen(false)}>

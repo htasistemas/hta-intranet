@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { Controller, useForm, useWatch, type SubmitErrorHandler } from "react-hook-form";
 import { z } from "zod";
 import { api } from "@/services/api";
-import type { Category, Client, PageResult, Project } from "@/types";
+import type { Category, Client, PageResult, ProductService, Project } from "@/types";
 import { Button } from "@/components/ui/button";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input, Textarea } from "@/components/ui/input";
@@ -59,7 +59,8 @@ const schema = z.object({
   allowWhatsapp: z.boolean(),
   allowCalls: z.boolean(),
   consentDate: z.string(),
-  projectIds: z.array(z.string())
+  projectIds: z.array(z.string()),
+  productIds: z.array(z.string())
 }).superRefine((fields, context) => {
   const documentDigits = onlyDigits(fields.document);
   if (documentDigits.length > 0) {
@@ -132,7 +133,8 @@ const defaults: Fields = {
   allowWhatsapp: false,
   allowCalls: false,
   consentDate: "",
-  projectIds: []
+  projectIds: [],
+  productIds: []
 };
 
 const tabs: Array<{ id: TabId; label: string }> = [
@@ -191,7 +193,8 @@ const fieldTabs: Partial<Record<keyof Fields, TabId>> = {
   allowWhatsapp: "lgpd",
   allowCalls: "lgpd",
   consentDate: "lgpd",
-  projectIds: "projects"
+  projectIds: "projects",
+  productIds: "projects"
 };
 
 const selectClass = "h-11 w-full rounded-xl border border-slate-700 bg-sidebar px-3 text-sm text-foreground outline-none focus:border-accent";
@@ -407,7 +410,8 @@ function clientValues(client?: Client): Fields {
     allowWhatsapp: client.allowWhatsapp ?? false,
     allowCalls: client.allowCalls ?? false,
     consentDate: client.consentDate?.slice(0, 10) ?? "",
-    projectIds: client.projectLinks?.map((link) => link.project.id) ?? []
+    projectIds: client.projectLinks?.map((link) => link.project.id) ?? [],
+    productIds: client.products?.map((link) => link.product.id) ?? []
   };
 }
 
@@ -478,12 +482,73 @@ function ProjectSelector({ projects, selectedIds, onChange }: { projects: Projec
   );
 }
 
+function ProductSelector({ products, selectedIds, onChange }: { products: ProductService[]; selectedIds: string[]; onChange: (ids: string[]) => void }) {
+  const [productSearch, setProductSearch] = useState("");
+  const selectedProducts = products.filter((product) => selectedIds.includes(product.id));
+  const normalizedSearch = normalizeText(productSearch);
+  const filteredProducts = products.filter((product) => normalizeText(`${product.code} ${product.name} ${product.category ?? ""}`).includes(normalizedSearch));
+
+  const toggleProduct = (productId: string): void => {
+    if (selectedIds.includes(productId)) {
+      onChange(selectedIds.filter((selectedId) => selectedId !== productId));
+      return;
+    }
+    onChange([...selectedIds, productId]);
+  };
+
+  return (
+    <div className="space-y-3">
+      <label className="relative block">
+        <span className="sr-only">Buscar produto</span>
+        <Search className="absolute left-3 top-3 text-slate-500" size={18} />
+        <Input className="pl-10" value={productSearch} onChange={(event) => setProductSearch(event.target.value)} placeholder="Buscar por codigo, nome ou categoria" />
+      </label>
+      {selectedProducts.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {selectedProducts.map((product) => (
+            <button
+              key={product.id}
+              type="button"
+              className="inline-flex max-w-full items-center gap-2 rounded-full border border-sky-400/30 bg-sky-400/10 px-3 py-1 text-xs text-sky-200"
+              onClick={() => toggleProduct(product.id)}
+            >
+              <span className="truncate">{product.code} - {product.name}</span>
+              <X size={14} aria-hidden="true" />
+              <span className="sr-only">Remover produto</span>
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="max-h-56 overflow-y-auto rounded-xl border border-slate-700 bg-sidebar">
+        {filteredProducts.length === 0 ? (
+          <p className="px-3 py-4 text-sm text-slate-400">Nenhum produto encontrado.</p>
+        ) : filteredProducts.map((product) => (
+          <label key={product.id} className="flex cursor-pointer items-start gap-3 border-b border-slate-700/60 px-3 py-3 last:border-0 hover:bg-white/[.03]">
+            <input
+              type="checkbox"
+              className="mt-1 h-4 w-4 rounded border-slate-600 bg-card accent-accent"
+              checked={selectedIds.includes(product.id)}
+              onChange={() => toggleProduct(product.id)}
+            />
+            <span className="min-w-0">
+              <span className="block text-sm font-medium">{product.code} - {product.name}</span>
+              <span className="block text-xs text-slate-400">{[product.type, product.category].filter(Boolean).join(" / ")}</span>
+            </span>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function ClientForm({ client, onSave, onCancel }: { client?: Client; onSave: (input: Record<string, unknown>) => Promise<void>; onCancel: () => void }) {
   const [activeTab, setActiveTab] = useState<TabId>("identity");
   const { toast } = useToast();
   const { data: categories = [] } = useQuery({ queryKey: ["categories"], queryFn: () => api.get<Category[]>("/categories") });
   const { data: projectsResult } = useQuery({ queryKey: ["projects", "client-form"], queryFn: () => api.get<PageResult<Project>>("/projects?pageSize=100") });
+  const { data: productsResult } = useQuery({ queryKey: ["products", "client-form"], queryFn: () => api.get<PageResult<ProductService>>("/products?pageSize=100") });
   const projects = projectsResult?.data ?? [];
+  const products = productsResult?.data ?? [];
   const values = useMemo(() => clientValues(client), [client]);
   const { register, control, handleSubmit, setValue, getValues, formState: { errors, isSubmitting } } = useForm<Fields>({ resolver: zodResolver(schema), values });
   const type = useWatch({ control, name: "type" });
@@ -605,6 +670,7 @@ export function ClientForm({ client, onSave, onCancel }: { client?: Client; onSa
 
           {activeTab === "contact" && (
             <fieldset className="grid gap-4 md:grid-cols-3">
+              <label>Nome do contato<Input {...register("responsible")} /></label>
               <Controller control={control} name="phone" render={({ field }) => <label>Telefone<Input value={maskPhone(field.value)} onChange={(event) => field.onChange(maskPhone(event.target.value))} /></label>} />
               <Controller control={control} name="whatsapp" render={({ field }) => <label>WhatsApp<Input value={maskPhone(field.value)} onChange={(event) => field.onChange(maskPhone(event.target.value))} /></label>} />
               <label>Email<Input type="email" {...register("email")} /><FieldError message={errors.email?.message} /></label>
@@ -650,10 +716,14 @@ export function ClientForm({ client, onSave, onCancel }: { client?: Client; onSa
           )}
 
           {activeTab === "projects" && (
-            <fieldset className="grid gap-4">
+            <fieldset className="grid gap-5 xl:grid-cols-2">
               <div>
                 <span className="mb-2 block text-sm">Vincular a projetos</span>
                 <Controller control={control} name="projectIds" render={({ field }) => <ProjectSelector projects={projects} selectedIds={field.value} onChange={field.onChange} />} />
+              </div>
+              <div>
+                <span className="mb-2 block text-sm">Vincular a produtos</span>
+                <Controller control={control} name="productIds" render={({ field }) => <ProductSelector products={products} selectedIds={field.value} onChange={field.onChange} />} />
               </div>
             </fieldset>
           )}

@@ -96,7 +96,7 @@ export default function ClientsPage() {
   const { data, isLoading } = useQuery({ queryKey: ["clients", "active", search], queryFn: () => api.get<PageResult<Client>>(`/clients?pageSize=30&status=ACTIVE&search=${encodeURIComponent(search)}`) });
   const save = useMutation({
     mutationFn: (input: Record<string, unknown>) => selected ? api.put<Client>(`/clients/${selected.id}`, input) : api.post<Client>("/clients", input),
-    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["clients"] }); setOpened(false); toast("Cliente salvo com sucesso."); },
+    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["clients"] }); void queryClient.invalidateQueries({ queryKey: ["message-clients"] }); setOpened(false); toast("Cliente salvo com sucesso."); },
     onError: (error) => toast(error.message, "error")
   });
   const remove = useMutation({
@@ -108,6 +108,7 @@ export default function ClientsPage() {
     mutationFn: (clientId: string) => api.post<unknown>(`/clients/${clientId}/move-to-prospecting`, {}),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["clients"] });
+      void queryClient.invalidateQueries({ queryKey: ["message-clients"] });
       void queryClient.invalidateQueries({ queryKey: ["crm-leads"] });
       void queryClient.invalidateQueries({ queryKey: ["crm-lead-cities"] });
       void queryClient.invalidateQueries({ queryKey: ["crm-lead-stats"] });
@@ -121,6 +122,7 @@ export default function ClientsPage() {
   };
   const handleImported = (result: ClientImportResult) => {
     void queryClient.invalidateQueries({ queryKey: ["clients"] });
+    void queryClient.invalidateQueries({ queryKey: ["message-clients"] });
     const message = result.failed ? `${result.created} cliente(s) importado(s). ${result.failed} linha(s) com erro.` : `${result.created} cliente(s) importado(s) com sucesso.`;
     toast(message, result.failed ? "error" : "success");
   };

@@ -56,6 +56,31 @@ export class ClientRepository {
     return prisma.client.update({ where: { id }, data, include: includeRelations });
   }
 
+  public async syncProductLinks(clientId: string, ownerId: string, productIds: string[]) {
+    const uniqueProductIds = [...new Set(productIds)];
+    await prisma.$transaction(async (tx) => {
+      await tx.clientProduct.deleteMany({
+        where: {
+          clientId,
+          ownerId,
+          ...(uniqueProductIds.length ? { productId: { notIn: uniqueProductIds } } : {})
+        }
+      });
+      if (!uniqueProductIds.length) return;
+      const existingLinks = await tx.clientProduct.findMany({
+        where: { clientId, ownerId, productId: { in: uniqueProductIds } },
+        select: { productId: true }
+      });
+      const existingProductIds = new Set(existingLinks.map((link) => link.productId));
+      const missingProductIds = uniqueProductIds.filter((productId) => !existingProductIds.has(productId));
+      if (!missingProductIds.length) return;
+      await tx.clientProduct.createMany({
+        data: missingProductIds.map((productId) => ({ clientId, ownerId, productId, status: "ACTIVE" }))
+      });
+    });
+    return this.findById(clientId, ownerId);
+  }
+
   public delete(id: string) {
     return prisma.client.delete({ where: { id } });
   }

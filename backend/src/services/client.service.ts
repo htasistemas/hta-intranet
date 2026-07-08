@@ -43,7 +43,7 @@ export class ClientService {
   }
 
   public async create(input: ClientInput, userId: string) {
-    const { tagIds, projectIds, categoryId, ...data } = input;
+    const { tagIds, projectIds, productIds, categoryId, ...data } = input;
     const client = await this.repository.create({
       ...data,
       owner: { connect: { id: userId } },
@@ -51,8 +51,9 @@ export class ClientService {
       ...(tagIds.length ? { tags: { create: tagIds.map((tagId) => ({ tag: { connect: { id: tagId } } })) } } : {}),
       ...(projectIds.length ? { projectLinks: { create: projectIds.map((projectId) => ({ project: { connect: { id: projectId } } })) } } : {})
     });
+    const linkedClient = await this.repository.syncProductLinks(client.id, userId, productIds);
     await this.auditRepository.log({ userId, clientId: client.id, entity: "Client", entityId: client.id, action: "CREATED" });
-    return client;
+    return linkedClient ?? client;
   }
 
   public async importMany(rows: unknown[], userId: string): Promise<ClientImportResult> {
@@ -96,15 +97,16 @@ export class ClientService {
 
   public async update(id: string, input: ClientInput, userId: string) {
     await this.get(id, userId);
-    const { tagIds, projectIds, categoryId, ...data } = input;
-    const client = await this.repository.update(id, {
+    const { tagIds, projectIds, productIds, categoryId, ...data } = input;
+    await this.repository.update(id, {
       ...data,
       category: categoryId ? { connect: { id: categoryId } } : { disconnect: true },
       tags: { deleteMany: {}, create: tagIds.map((tagId) => ({ tag: { connect: { id: tagId } } })) },
       projectLinks: { deleteMany: {}, create: projectIds.map((projectId) => ({ project: { connect: { id: projectId } } })) }
     });
+    const client = await this.repository.syncProductLinks(id, userId, productIds);
     await this.auditRepository.log({ userId, clientId: id, entity: "Client", entityId: id, action: "UPDATED", changes: { updatedFields: Object.keys(input) } });
-    return client;
+    return client ?? await this.get(id, userId);
   }
 
   public async delete(id: string, userId: string): Promise<void> {

@@ -87,7 +87,8 @@ export const clientSchema = z.object({
   consentDate: z.coerce.date().optional().nullable(),
   categoryId: optionalText,
   tagIds: z.array(z.string()).default([]),
-  projectIds: z.array(z.string()).default([])
+  projectIds: z.array(z.string()).default([]),
+  productIds: z.array(z.string()).default([])
 }).superRefine((fields, context) => {
   const document = fields.document ?? "";
   const documentDigits = onlyDigits(document);

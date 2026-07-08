@@ -8,9 +8,11 @@ import type {
 } from "@prisma/client";
 import type { z } from "zod";
 import { differenceInHours } from "date-fns";
+import nodemailer from "nodemailer";
 import { prisma } from "../prisma/client.js";
 import { ApiError } from "../utils/api-error.js";
 import { decryptSecret, encryptSecret } from "../utils/crypto.js";
+import { env } from "../utils/env.js";
 import type {
   communicationCampaignSchema,
   communicationProviderConfigSchema,
@@ -76,6 +78,35 @@ async function postProvider(config: { endpointUrl: string | null; apiKeyEncrypte
   if (!response.ok) throw new ApiError(response.status, "Provider de comunicacao recusou o envio.");
   const body = await response.json().catch(() => ({})) as { id?: string; messageId?: string };
   return body.messageId ?? body.id ?? null;
+}
+
+function smtpConfigured(): boolean {
+  return Boolean(env.APP_EMAIL_HABILITADO && env.MAIL_HOST && env.MAIL_PORT && env.MAIL_USER && env.MAIL_PASS && env.APP_EMAIL_REMETENTE);
+}
+
+async function sendSmtp(message: { recipient: string; recipientName: string | null; subject: string | null; body: string }): Promise<string | null> {
+  if (!smtpConfigured()) throw new ApiError(500, "Servidor de e-mail SMTP nao configurado.");
+  if (env.MAIL_PASS === "trocar_por_app_password") throw new ApiError(500, "Configure MAIL_PASS com a senha de app do Gmail.");
+  const host = env.MAIL_HOST;
+  const port = env.MAIL_PORT;
+  const user = env.MAIL_USER;
+  const pass = env.MAIL_PASS;
+  const fromAddress = env.APP_EMAIL_REMETENTE;
+  if (!host || !port || !user || !pass || !fromAddress) throw new ApiError(500, "Servidor de e-mail SMTP incompleto.");
+  const transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: { user, pass }
+  });
+  const result = await transporter.sendMail({
+    from: { address: fromAddress, name: env.APP_EMAIL_NOME ?? fromAddress },
+    to: message.recipientName ? { address: message.recipient, name: message.recipientName } : message.recipient,
+    subject: message.subject ?? "Contato HTA Sistemas",
+    text: message.body,
+    html: message.body.replace(/\n/g, "<br />")
+  }) as { messageId?: string };
+  return result.messageId ?? null;
 }
 
 export class CommunicationService {
@@ -345,7 +376,7 @@ export class CommunicationService {
         status,
         templateId: input.templateId,
         leadId: input.leadId,
-        clientId: input.clientId,
+        clientId: client?.id,
         campaignId,
         recipientName: input.recipientName ?? client?.name ?? lead?.name,
         recipient: input.recipient,
@@ -358,6 +389,9 @@ export class CommunicationService {
   }
 
   private async deliver(message: { channel: CommunicationChannel; recipient: string; recipientName: string | null; subject: string | null; body: string; metadata: Prisma.JsonValue }): Promise<ProviderSendResult> {
+    if (message.channel === "EMAIL" && smtpConfigured()) {
+      return { provider: "SMTP", providerMessageId: await sendSmtp(message) };
+    }
     const config = await prisma.communicationProviderConfig.findFirst({
       where: { tenantId: "default", channel: message.channel, active: true, deletedAt: null },
       orderBy: { createdAt: "desc" }

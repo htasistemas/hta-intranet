@@ -10,6 +10,13 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(32),
   JWT_EXPIRES_IN: z.string().default("15m"),
   JWT_REFRESH_EXPIRES_IN: z.string().default("7d"),
+  APP_EMAIL_HABILITADO: z.coerce.boolean().default(false),
+  APP_EMAIL_REMETENTE: z.string().email().optional(),
+  APP_EMAIL_NOME: z.string().optional(),
+  MAIL_HOST: z.string().optional(),
+  MAIL_PORT: z.coerce.number().int().positive().optional(),
+  MAIL_USER: z.string().optional(),
+  MAIL_PASS: z.string().optional(),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_REDIRECT_URI: z.string().url().optional()
