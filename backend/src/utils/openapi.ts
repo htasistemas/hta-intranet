@@ -1,6 +1,8 @@
+import { SYSTEM_VERSION } from "./version.js";
+
 export const openApiDocument = {
   openapi: "3.1.0",
-  info: { title: "AMT Brasil API", version: "1.0.0", description: "REST API para clientes, agenda e gestao pessoal." },
+  info: { title: "AMT Brasil API", version: SYSTEM_VERSION, description: "REST API para clientes, agenda e gestao pessoal." },
   servers: [{ url: "http://localhost:3333/api" }],
   components: { securitySchemes: { bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" } } },
   paths: {

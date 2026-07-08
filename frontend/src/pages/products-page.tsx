@@ -240,6 +240,14 @@ export default function ProductsPage() {
     onSuccess: () => { invalidate(); setContractToDelete(undefined); toast("Vinculo removido."); },
     onError: (error) => toast(error.message, "error")
   });
+  const openProductForm = (product: ProductService): void => {
+    setSelectedProduct(product);
+    setProductDialogOpen(true);
+  };
+  const closeProductForm = (): void => {
+    setProductDialogOpen(false);
+    setSelectedProduct(undefined);
+  };
 
   return (
     <div className="space-y-5">
@@ -262,11 +270,16 @@ export default function ProductsPage() {
               <thead className="border-b border-slate-700 text-xs uppercase text-slate-400"><tr><th className="p-5">Produto/servico</th><th>Tipo</th><th>Preco</th><th>Status</th><th /></tr></thead>
               <tbody>{products.map((product) => (
                 <tr key={product.id} className="border-b border-slate-700/50">
-                  <td className="p-5"><p className="font-medium">{product.code} - {product.name}</p><p className="text-xs text-slate-400">{product.category ?? "Sem categoria"}</p></td>
+                  <td className="p-5">
+                    <button type="button" className="text-left font-medium transition hover:text-accent" onClick={() => openProductForm(product)}>
+                      {product.code} - {product.name}
+                    </button>
+                    <p className="text-xs text-slate-400">{product.category ?? "Sem categoria"}</p>
+                  </td>
                   <td>{product.type}</td>
                   <td>{currency(Number(product.price ?? 0))}</td>
                   <td><span className="rounded-full bg-accent/10 px-3 py-1 text-xs text-accent">{product.status}</span></td>
-                  <td><div className="flex justify-end gap-1 pr-3"><Button variant="ghost" size="icon" onClick={() => { setSelectedProduct(product); setProductDialogOpen(true); }} aria-label="Editar produto"><Edit3 size={17} /></Button><Button variant="danger" size="icon" onClick={() => setProductToDelete(product)} aria-label="Excluir produto"><Trash2 size={17} /></Button></div></td>
+                  <td><div className="flex justify-end gap-1 pr-3"><Button variant="ghost" size="sm" onClick={() => openProductForm(product)} aria-label="Editar produto"><Edit3 size={17} /> Editar</Button><Button variant="danger" size="icon" onClick={() => setProductToDelete(product)} aria-label="Excluir produto"><Trash2 size={17} /></Button></div></td>
                 </tr>
               ))}</tbody>
             </table>
@@ -299,8 +312,8 @@ export default function ProductsPage() {
           ))}
         </Card>
       </section>
-      <Dialog open={productDialogOpen} title={selectedProduct ? "Editar produto/servico" : "Novo produto/servico"} onClose={() => setProductDialogOpen(false)}>
-        <ProductForm product={selectedProduct} onCancel={() => setProductDialogOpen(false)} onSave={(input) => saveProduct.mutateAsync(input).then(() => undefined)} />
+      <Dialog open={productDialogOpen} title={selectedProduct ? "Editar produto/servico" : "Novo produto/servico"} onClose={closeProductForm}>
+        <ProductForm product={selectedProduct} onCancel={closeProductForm} onSave={(input) => saveProduct.mutateAsync(input).then(() => undefined)} />
       </Dialog>
       <Dialog open={contractDialogOpen} title={selectedContract ? "Editar produto contratado" : "Vincular produto ao cliente"} onClose={() => setContractDialogOpen(false)}>
         <ContractForm contract={selectedContract} products={products} clients={clients} onCancel={() => setContractDialogOpen(false)} onSave={(input) => saveContract.mutateAsync(input).then(() => undefined)} />

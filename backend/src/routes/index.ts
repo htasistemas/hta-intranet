@@ -45,6 +45,7 @@ import {
 } from "../validations/entities.validation.js";
 import { loginSchema, refreshSchema } from "../validations/auth.validation.js";
 import { openApiDocument } from "../utils/openapi.js";
+import { SYSTEM_VERSION } from "../utils/version.js";
 
 const auth = new AuthController();
 const clients = new ClientController();
@@ -63,7 +64,7 @@ export const apiRouter = Router();
 const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false });
 apiRouter.get("/", (_request, response) => response.json({
   name: "AMT Brasil API",
-  version: "1.0.0",
+  version: SYSTEM_VERSION,
   documentation: "/api/docs",
   authentication: "/api/auth/login"
 }));

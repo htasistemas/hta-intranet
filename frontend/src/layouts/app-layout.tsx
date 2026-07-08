@@ -29,6 +29,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SYSTEM_VERSION } from "@/config/version";
 
 interface NavigationItem {
   label: string;
@@ -226,7 +227,7 @@ export function AppLayout() {
         </button>
       </aside>
 
-      <div className={cn("transition-[padding] duration-300", collapsed ? "lg:pl-20" : "lg:pl-72")}>
+      <div className={cn("flex min-h-screen flex-col transition-[padding] duration-300", collapsed ? "lg:pl-20" : "lg:pl-72")}>
         <header className="sticky top-0 z-20 flex h-20 items-center gap-4 border-b border-slate-800/80 bg-background/90 px-4 backdrop-blur md:px-8">
           <button className="lg:hidden" onClick={() => setMobileOpened(true)} aria-label="Abrir menu">
             <Menu />
@@ -240,7 +241,10 @@ export function AppLayout() {
             <Input className="pl-10" placeholder="Pesquisar..." />
           </label>
         </header>
-        <main className="p-4 md:p-8"><Outlet /></main>
+        <main className="flex-1 p-4 md:p-8"><Outlet /></main>
+        <footer className="border-t border-slate-800/80 px-4 py-3 text-right text-xs text-slate-500 md:px-8">
+          Versao {SYSTEM_VERSION}
+        </footer>
       </div>
       {mobileOpened && (
         <button className="fixed inset-0 z-30 bg-black/50 lg:hidden" onClick={() => setMobileOpened(false)} aria-label="Fechar navegacao" />
