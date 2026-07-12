@@ -202,8 +202,9 @@ export function AppLayout() {
 
         <div className={cn("border-t border-slate-700/60 p-4", collapsed && "lg:px-3")}>
           <div className={cn(collapsed && "lg:hidden")}>
-            <p className="truncate text-sm font-medium">{session?.user.name}</p>
-            <p className="mb-3 truncate text-xs text-slate-400">{session?.user.email}</p>
+            <p className="truncate text-center text-sm font-medium">{session?.user.name}</p>
+            <p className="mb-3 truncate text-center text-xs text-slate-400">{session?.user.email}</p>
+            <p className="mb-3 text-center text-xs text-slate-500">Versao {SYSTEM_VERSION}</p>
           </div>
           <Button
             variant="ghost"
@@ -242,9 +243,6 @@ export function AppLayout() {
           </label>
         </header>
         <main className="flex-1 p-4 md:p-8"><Outlet /></main>
-        <footer className="border-t border-slate-800/80 px-4 py-3 text-right text-xs text-slate-500 md:px-8">
-          Versao {SYSTEM_VERSION}
-        </footer>
       </div>
       {mobileOpened && (
         <button className="fixed inset-0 z-30 bg-black/50 lg:hidden" onClick={() => setMobileOpened(false)} aria-label="Fechar navegacao" />
