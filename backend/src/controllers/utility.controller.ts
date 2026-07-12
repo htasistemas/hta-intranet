@@ -39,6 +39,118 @@ async function fetchJson<T>(url: string, notFoundMessage: string): Promise<T> {
   }
 }
 
+interface CnpjLookupResponse {
+  document: string;
+  name: string;
+  legalName: string;
+  email: string;
+  phone: string;
+  postalCode: string;
+  street: string;
+  number: string;
+  district: string;
+  city: string;
+  state: string;
+  segment: string;
+  openingDate: string;
+}
+
+interface BrasilApiCnpjResponse {
+  cnpj: string;
+  razao_social?: string;
+  nome_fantasia?: string;
+  descricao_tipo_logradouro?: string;
+  logradouro?: string;
+  numero?: string;
+  bairro?: string;
+  municipio?: string;
+  uf?: string;
+  cep?: string;
+  email?: string;
+  ddd_telefone_1?: string;
+  cnae_fiscal_descricao?: string;
+  data_inicio_atividade?: string;
+}
+
+interface ReceitaWsActivity {
+  text?: string;
+}
+
+interface ReceitaWsCnpjResponse {
+  status?: string;
+  message?: string;
+  cnpj?: string;
+  nome?: string;
+  fantasia?: string;
+  email?: string;
+  telefone?: string;
+  cep?: string;
+  logradouro?: string;
+  numero?: string;
+  bairro?: string;
+  municipio?: string;
+  uf?: string;
+  abertura?: string;
+  atividade_principal?: ReceitaWsActivity[];
+}
+
+function normalizeDate(value: string | undefined): string {
+  if (!value) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value);
+  if (!match) return "";
+  const [, day, month, year] = match;
+  return `${year}-${month}-${day}`;
+}
+
+async function fetchCnpjFromBrasilApi(cnpj: string): Promise<CnpjLookupResponse | null> {
+  const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`, { signal: AbortSignal.timeout(10000) });
+  if (response.status === 404 || response.status === 400) return null;
+  if (!response.ok) throw new ApiError(502, "BrasilAPI indisponivel.");
+  const data = await response.json() as BrasilApiCnpjResponse;
+  return {
+    document: data.cnpj,
+    name: data.nome_fantasia || data.razao_social || "",
+    legalName: data.razao_social ?? "",
+    email: data.email ?? "",
+    phone: data.ddd_telefone_1 ?? "",
+    postalCode: data.cep ?? "",
+    street: [data.descricao_tipo_logradouro, data.logradouro].filter(Boolean).join(" "),
+    number: data.numero ?? "",
+    district: data.bairro ?? "",
+    city: data.municipio ?? "",
+    state: data.uf ?? "",
+    segment: data.cnae_fiscal_descricao ?? "",
+    openingDate: normalizeDate(data.data_inicio_atividade)
+  };
+}
+
+async function fetchCnpjFromReceitaWs(cnpj: string): Promise<CnpjLookupResponse | null> {
+  const response = await fetch(`https://www.receitaws.com.br/v1/cnpj/${cnpj}`, { signal: AbortSignal.timeout(10000) });
+  if (response.status === 404 || response.status === 400) return null;
+  if (!response.ok) throw new ApiError(502, "ReceitaWS indisponivel.");
+  const data = await response.json() as ReceitaWsCnpjResponse;
+  if (data.status === "ERROR") {
+    if (data.message?.toLowerCase().includes("too many requests")) throw new ApiError(502, "ReceitaWS indisponivel.");
+    return null;
+  }
+  return {
+    document: data.cnpj ?? cnpj,
+    name: data.fantasia || data.nome || "",
+    legalName: data.nome ?? "",
+    email: data.email ?? "",
+    phone: data.telefone ?? "",
+    postalCode: data.cep ?? "",
+    street: data.logradouro ?? "",
+    number: data.numero ?? "",
+    district: data.bairro ?? "",
+    city: data.municipio ?? "",
+    state: data.uf ?? "",
+    segment: data.atividade_principal?.[0]?.text ?? "",
+    openingDate: normalizeDate(data.abertura)
+  };
+}
+
 export class UtilityController {
   public constructor(
     private readonly dashboard = new DashboardService(),
@@ -65,35 +177,20 @@ export class UtilityController {
   public lookupCnpj = async (request: Request, response: Response): Promise<void> => {
     const rawCnpj = z.string().parse(request.params.cnpj);
     const cnpj = z.string().regex(/^\d{14}$/).parse(rawCnpj.replace(/\D/g, ""));
-    const data = await fetchJson<{
-      cnpj: string;
-      razao_social?: string;
-      nome_fantasia?: string;
-      descricao_tipo_logradouro?: string;
-      logradouro?: string;
-      numero?: string;
-      bairro?: string;
-      municipio?: string;
-      uf?: string;
-      cep?: string;
-      email?: string;
-      ddd_telefone_1?: string;
-      cnae_fiscal_descricao?: string;
-    }>(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`, "CNPJ nao encontrado.");
-    response.json({
-      document: data.cnpj,
-      name: data.nome_fantasia || data.razao_social || "",
-      legalName: data.razao_social ?? "",
-      email: data.email ?? "",
-      phone: data.ddd_telefone_1 ?? "",
-      postalCode: data.cep ?? "",
-      street: [data.descricao_tipo_logradouro, data.logradouro].filter(Boolean).join(" "),
-      number: data.numero ?? "",
-      district: data.bairro ?? "",
-      city: data.municipio ?? "",
-      state: data.uf ?? "",
-      segment: data.cnae_fiscal_descricao ?? ""
-    });
+    const errors: string[] = [];
+    for (const fetcher of [fetchCnpjFromBrasilApi, fetchCnpjFromReceitaWs]) {
+      try {
+        const data = await fetcher(cnpj);
+        if (data) {
+          response.json(data);
+          return;
+        }
+      } catch (error) {
+        errors.push(error instanceof Error ? error.message : "Servico externo indisponivel.");
+      }
+    }
+    if (errors.length === 2) throw new ApiError(502, "Servicos de consulta de CNPJ indisponiveis no momento. Tente novamente em instantes.");
+    throw new ApiError(404, "CNPJ nao encontrado.");
   };
 
   public categories = async (_request: Request, response: Response): Promise<void> => {

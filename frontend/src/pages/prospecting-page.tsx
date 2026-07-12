@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Edit3, LayoutGrid, List, Plus, Search, Trash2, TrendingUp, Upload, UserCheck } from "lucide-react";
+import { Edit3, LayoutGrid, List, Plus, Printer, Search, Trash2, TrendingUp, Upload, UserCheck } from "lucide-react";
 import { api } from "@/services/api";
 import type { PageResult } from "@/types";
 import type { CrmLead, CrmLeadCityStat, CrmLeadImportResult, CrmLeadScore, CrmLeadStats, CrmLeadStatus } from "@/types/crm";
@@ -32,6 +32,20 @@ const scoreLabels: Record<CrmLeadScore, string> = {
   COLD: "Frio"
 };
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function printableValue(value: string | number | null | undefined): string {
+  if (value === null || value === undefined || value === "") return "-";
+  return String(value);
+}
+
 export default function ProspectingPage() {
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
@@ -46,6 +60,85 @@ export default function ProspectingPage() {
   const leadStats = useQuery({ queryKey: ["crm-lead-stats"], queryFn: () => api.get<CrmLeadStats>("/crm/leads/stats") });
   const leads = data?.data ?? [];
   const cities = cityStats.data ?? [];
+
+  const printVisibleLeads = (): void => {
+    if (!leads.length) {
+      toast("Nao ha captacoes para imprimir.", "error");
+      return;
+    }
+
+    const printWindow = window.open("", "_blank", "noopener,noreferrer");
+    if (!printWindow) {
+      toast("Nao foi possivel abrir a janela de impressao.", "error");
+      return;
+    }
+
+    const generatedAt = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date());
+    const rows = leads.map((lead) => `
+      <tr>
+        <td><strong>${escapeHtml(lead.name)}</strong><br><span>${escapeHtml(printableValue(lead.company ?? lead.segment))}</span></td>
+        <td>${escapeHtml(printableValue(lead.email))}<br><span>${escapeHtml(printableValue(lead.whatsapp ?? lead.phone))}</span></td>
+        <td>${escapeHtml([lead.city, lead.state].filter(Boolean).join(" / ") || "-")}</td>
+        <td>${escapeHtml(statusLabels[lead.status])}<br><span>${escapeHtml(scoreLabels[lead.score])}</span></td>
+        <td>${escapeHtml(currency(Number(lead.estimatedValue ?? 0)))}</td>
+        <td>${escapeHtml(printableValue(lead.responsible))}</td>
+        <td>${escapeHtml(printableValue(lead.source))}</td>
+      </tr>
+    `).join("");
+
+    printWindow.document.write(`
+      <!doctype html>
+      <html lang="pt-BR">
+        <head>
+          <meta charset="utf-8">
+          <title>Lista de captacao</title>
+          <style>
+            * { box-sizing: border-box; }
+            body { margin: 24px; color: #111827; font-family: Arial, sans-serif; font-size: 12px; }
+            header { margin-bottom: 18px; }
+            h1 { margin: 0 0 6px; font-size: 20px; }
+            p { margin: 0; color: #4b5563; }
+            table { width: 100%; border-collapse: collapse; }
+            th { background: #f3f4f6; color: #374151; font-size: 10px; letter-spacing: .04em; text-align: left; text-transform: uppercase; }
+            th, td { border: 1px solid #d1d5db; padding: 8px; vertical-align: top; }
+            span { color: #6b7280; }
+            @media print {
+              body { margin: 12mm; }
+              button { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <header>
+            <h1>Lista de captacao</h1>
+            <p>${leads.length} registro(s) visualizado(s)${search ? ` - Busca: ${escapeHtml(search)}` : ""}</p>
+            <p>Gerado em ${escapeHtml(generatedAt)}</p>
+          </header>
+          <table>
+            <thead>
+              <tr>
+                <th>Captacao</th>
+                <th>Contato</th>
+                <th>Localidade</th>
+                <th>Status</th>
+                <th>Valor</th>
+                <th>Responsavel</th>
+                <th>Origem</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+          <script>
+            window.addEventListener("load", () => {
+              window.print();
+              window.close();
+            });
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
 
   const refreshLists = () => {
     void queryClient.invalidateQueries({ queryKey: ["crm-leads"] });
@@ -127,6 +220,7 @@ export default function ProspectingPage() {
             <List size={17} /> Lista
           </button>
         </div>
+        <Button variant="outline" onClick={printVisibleLeads} disabled={isLoading || !leads.length}><Printer size={17} /> Imprimir</Button>
         <Button variant="outline" onClick={() => setImportOpened(true)}><Upload size={17} /> Importar</Button>
         <Button onClick={() => { setSelected(undefined); setOpened(true); }}><Plus size={17} /> Nova captacao</Button>
       </div>
