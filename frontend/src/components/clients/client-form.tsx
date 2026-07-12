@@ -115,7 +115,7 @@ const defaults: Fields = {
   companySize: "",
   responsible: "",
   priority: "MEDIUM",
-  temperature: "WARM",
+  temperature: "MEDIUM",
   firstPurchaseAt: "",
   lastPurchaseAt: "",
   nextFollowUpAt: "",
@@ -429,7 +429,7 @@ function clientValues(client?: Client): Fields {
     companySize: client.companySize ?? "",
     responsible: client.responsible ?? "",
     priority: client.priority ?? "MEDIUM",
-    temperature: client.temperature ?? "WARM",
+    temperature: potentialValue(client.temperature),
     firstPurchaseAt: client.firstPurchaseAt?.slice(0, 10) ?? "",
     lastPurchaseAt: client.lastPurchaseAt?.slice(0, 10) ?? "",
     nextFollowUpAt: client.nextFollowUpAt?.slice(0, 10) ?? "",
@@ -450,6 +450,13 @@ function clientValues(client?: Client): Fields {
     projectIds: client.projectLinks?.map((link) => link.project.id) ?? [],
     productIds: client.products?.map((link) => link.product.id) ?? []
   };
+}
+
+function potentialValue(value: string | null | undefined): string {
+  if (value === "COLD" || value === "LOW") return "LOW";
+  if (value === "HOT" || value === "HIGH") return "HIGH";
+  if (value === "VERY_HOT" || value === "VERY_HIGH") return "VERY_HIGH";
+  return "MEDIUM";
 }
 
 function FieldError({ message }: { message?: string }) {
@@ -681,7 +688,7 @@ export function ClientForm({ client, onSave, onCancel }: { client?: Client; onSa
           <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[520px]">
             <label className="text-xs text-slate-400">Status<select className={selectClass} {...register("status")}><option value="PROSPECT">Prospect</option><option value="ACTIVE">Ativo</option><option value="INACTIVE">Inativo</option></select></label>
             <label className="text-xs text-slate-400">Prioridade<select className={selectClass} {...register("priority")}><option value="LOW">Baixa</option><option value="MEDIUM">Media</option><option value="HIGH">Alta</option><option value="URGENT">Urgente</option></select></label>
-            <label className="text-xs text-slate-400">Temperatura<select className={selectClass} {...register("temperature")}><option value="COLD">Frio</option><option value="WARM">Morno</option><option value="HOT">Quente</option><option value="VERY_HOT">Muito quente</option></select></label>
+            <label className="text-xs text-slate-400">Potencial<select className={selectClass} {...register("temperature")}><option value="LOW">Baixo</option><option value="MEDIUM">Medio</option><option value="HIGH">Alto</option><option value="VERY_HIGH">Fechamento provavel</option></select></label>
           </div>
         </div>
       </header>
@@ -698,8 +705,8 @@ export function ClientForm({ client, onSave, onCancel }: { client?: Client; onSa
         <section className="min-w-0">
           {activeTab === "identity" && (
         <fieldset className="grid gap-4 md:grid-cols-3">
+          <label>Codigo interno<Input placeholder="Gerado automaticamente" readOnly {...register("internalCode")} /></label>
           <label>Tipo<select className={selectClass} {...register("type")}><option value="INDIVIDUAL">Pessoa fisica</option><option value="COMPANY">Empresa</option></select></label>
-          <label>Codigo interno<Input placeholder="CLI-0001" {...register("internalCode")} /></label>
           <label>{isCompany ? "CNPJ" : "CPF"}<Controller control={control} name="document" render={({ field }) => <div className="flex gap-2"><Input value={isCompany ? maskCnpj(field.value) : maskCpf(field.value)} onChange={(event) => field.onChange(isCompany ? maskCnpj(event.target.value) : maskCpf(event.target.value))} />{isCompany && <Button type="button" variant="outline" onClick={() => cnpjLookup.mutate(field.value)} disabled={cnpjLookup.isPending}>Buscar</Button>}</div>} /></label>
           <label className="md:col-span-2">{isCompany ? "Nome exibido" : "Nome completo"}<Input {...register("name")} /><FieldError message={errors.name?.message} /></label>
           {isCompany ? (

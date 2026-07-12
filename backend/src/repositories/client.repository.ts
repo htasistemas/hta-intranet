@@ -56,6 +56,24 @@ export class ClientRepository {
     return prisma.client.update({ where: { id }, data, include: includeRelations });
   }
 
+  public async nextInternalCode(ownerId: string): Promise<string> {
+    const clients = await prisma.client.findMany({
+      where: { ownerId, internalCode: { not: null } },
+      select: { internalCode: true }
+    });
+    const usedCodes = new Set(
+      clients
+        .map((client) => client.internalCode)
+        .filter((code): code is string => Boolean(code))
+        .map((code) => Number(code))
+        .filter((code) => Number.isInteger(code) && code >= 1 && code <= 99999)
+    );
+    for (let code = 1; code <= 99999; code += 1) {
+      if (!usedCodes.has(code)) return String(code);
+    }
+    throw new Error("Limite de codigos internos de clientes atingido.");
+  }
+
   public async syncProductLinks(clientId: string, ownerId: string, productIds: string[]) {
     const uniqueProductIds = [...new Set(productIds)];
     await prisma.$transaction(async (tx) => {

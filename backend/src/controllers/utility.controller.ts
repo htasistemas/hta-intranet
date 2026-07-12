@@ -97,6 +97,11 @@ export class UtilityController {
   };
 
   public categories = async (_request: Request, response: Response): Promise<void> => {
+    await prisma.category.upsert({
+      where: { name: "Software" },
+      update: { color: "#38BDF8" },
+      create: { name: "Software", color: "#38BDF8" }
+    });
     response.json(await prisma.category.findMany({ orderBy: { name: "asc" } }));
   };
 

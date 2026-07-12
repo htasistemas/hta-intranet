@@ -26,6 +26,10 @@ function priorityValue(priority: string | null | undefined): Priority {
   return "MEDIUM";
 }
 
+function clientInternalCode(input: ClientInput): string | null | undefined {
+  return input.internalCode?.trim() || undefined;
+}
+
 export class ClientService {
   public constructor(
     private readonly repository = new ClientRepository(),
@@ -44,8 +48,10 @@ export class ClientService {
 
   public async create(input: ClientInput, userId: string) {
     const { tagIds, projectIds, productIds, categoryId, ...data } = input;
+    const internalCode = clientInternalCode(input) ?? await this.repository.nextInternalCode(userId);
     const client = await this.repository.create({
       ...data,
+      internalCode,
       owner: { connect: { id: userId } },
       ...(categoryId ? { category: { connect: { id: categoryId } } } : {}),
       ...(tagIds.length ? { tags: { create: tagIds.map((tagId) => ({ tag: { connect: { id: tagId } } })) } } : {}),

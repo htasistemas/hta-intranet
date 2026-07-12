@@ -27,7 +27,8 @@ async function seed(): Promise<void> {
     [
       { name: "Consultoria", color: "#2DD4BF" },
       { name: "Premium", color: "#3B82F6" },
-      { name: "Renovacao", color: "#A78BFA" }
+      { name: "Renovacao", color: "#A78BFA" },
+      { name: "Software", color: "#38BDF8" }
     ].map((category) => prisma.category.upsert({ where: { name: category.name }, update: category, create: category }))
   );
   const [consultoria, premium, renovacao] = categories;
