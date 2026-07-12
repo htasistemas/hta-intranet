@@ -261,6 +261,43 @@ function dateOrNull(value: string): string | null {
   return value ? new Date(value).toISOString() : null;
 }
 
+const lowercaseTitleWords = new Set(["a", "as", "da", "das", "de", "do", "dos", "e", "em", "na", "nas", "no", "nos", "o", "os", "para", "por"]);
+
+function collapseSpaces(value: string): string {
+  return value.trim().replace(/\s+/g, " ");
+}
+
+function capitalizePart(value: string): string {
+  const lower = value.toLocaleLowerCase("pt-BR");
+  return lower.replace(/^\p{L}/u, (letter) => letter.toLocaleUpperCase("pt-BR"));
+}
+
+function toTitleText(value: string): string {
+  return collapseSpaces(value)
+    .split(" ")
+    .map((word, index) => {
+      const lower = word.toLocaleLowerCase("pt-BR");
+      if (index > 0 && lowercaseTitleWords.has(lower)) return lower;
+      return word.split("-").map(capitalizePart).join("-");
+    })
+    .join(" ");
+}
+
+function optionalTitle(value: string): string | null {
+  const trimmed = collapseSpaces(value);
+  return trimmed ? toTitleText(trimmed) : null;
+}
+
+function optionalUpper(value: string): string | null {
+  const trimmed = collapseSpaces(value);
+  return trimmed ? trimmed.toLocaleUpperCase("pt-BR") : null;
+}
+
+function optionalLower(value: string): string | null {
+  const trimmed = collapseSpaces(value);
+  return trimmed ? trimmed.toLocaleLowerCase("pt-BR") : null;
+}
+
 interface CepLookup {
   postalCode: string;
   street: string;
@@ -592,6 +629,21 @@ export function ClientForm({ client, onSave, onCancel }: { client?: Client; onSa
   const submit = async (fields: Fields): Promise<void> => {
     await onSave({
       ...fields,
+      name: toTitleText(fields.name),
+      internalCode: optionalUpper(fields.internalCode),
+      legalName: optionalTitle(fields.legalName),
+      tradeName: optionalTitle(fields.tradeName),
+      stateRegistration: optionalUpper(fields.stateRegistration),
+      municipalRegistration: optionalUpper(fields.municipalRegistration),
+      email: optionalLower(fields.email),
+      street: optionalTitle(fields.street),
+      district: optionalTitle(fields.district),
+      city: optionalTitle(fields.city),
+      state: optionalUpper(fields.state),
+      source: optionalTitle(fields.source),
+      segment: optionalTitle(fields.segment),
+      responsible: optionalTitle(fields.responsible),
+      paymentTerms: optionalTitle(fields.paymentTerms),
       document: fields.document ? onlyDigits(fields.document) : null,
       phone: fields.phone ? onlyDigits(fields.phone) : null,
       whatsapp: fields.whatsapp ? onlyDigits(fields.whatsapp) : null,

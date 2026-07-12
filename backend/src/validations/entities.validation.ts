@@ -1,9 +1,42 @@
 import { z } from "zod";
 
 const optionalText = z.string().trim().optional().nullable();
+const lowercaseTitleWords = new Set(["a", "as", "da", "das", "de", "do", "dos", "e", "em", "na", "nas", "no", "nos", "o", "os", "para", "por"]);
 
 function onlyDigits(value: string): string {
   return value.replace(/\D/g, "");
+}
+
+function collapseSpaces(value: string): string {
+  return value.trim().replace(/\s+/g, " ");
+}
+
+function capitalizePart(value: string): string {
+  const lower = value.toLocaleLowerCase("pt-BR");
+  return lower.replace(/^\p{L}/u, (letter) => letter.toLocaleUpperCase("pt-BR"));
+}
+
+function normalizeTitleText(value: string): string {
+  return collapseSpaces(value)
+    .split(" ")
+    .map((word, index) => {
+      const lower = word.toLocaleLowerCase("pt-BR");
+      if (index > 0 && lowercaseTitleWords.has(lower)) return lower;
+      return word.split("-").map(capitalizePart).join("-");
+    })
+    .join(" ");
+}
+
+function optionalTitleText() {
+  return z.string().trim().transform((value) => value ? normalizeTitleText(value) : value).optional().nullable();
+}
+
+function optionalUpperText() {
+  return z.string().trim().transform((value) => value ? collapseSpaces(value).toLocaleUpperCase("pt-BR") : value).optional().nullable();
+}
+
+function optionalLowerText() {
+  return z.string().trim().transform((value) => value ? collapseSpaces(value).toLocaleLowerCase("pt-BR") : value).optional().nullable();
 }
 
 function isRepeatedDigits(value: string): boolean {
@@ -41,32 +74,32 @@ function isValidCnpj(value: string): boolean {
 }
 
 export const clientSchema = z.object({
-  name: z.string().trim().min(2),
+  name: z.string().trim().min(2).transform(normalizeTitleText),
   document: optionalText,
   type: z.enum(["INDIVIDUAL", "COMPANY"]).default("INDIVIDUAL"),
-  internalCode: optionalText,
-  legalName: optionalText,
-  tradeName: optionalText,
-  stateRegistration: optionalText,
-  municipalRegistration: optionalText,
+  internalCode: optionalUpperText(),
+  legalName: optionalTitleText(),
+  tradeName: optionalTitleText(),
+  stateRegistration: optionalUpperText(),
+  municipalRegistration: optionalUpperText(),
   openingDate: z.coerce.date().optional().nullable(),
   birthDate: z.coerce.date().optional().nullable(),
   gender: optionalText,
   phone: optionalText,
   whatsapp: optionalText,
-  email: z.string().email().optional().nullable().or(z.literal("")),
+  email: z.string().trim().toLowerCase().email().optional().nullable().or(z.literal("")),
   postalCode: optionalText,
-  street: optionalText,
+  street: optionalTitleText(),
   number: optionalText,
-  district: optionalText,
-  city: optionalText,
-  state: optionalText,
+  district: optionalTitleText(),
+  city: optionalTitleText(),
+  state: optionalUpperText(),
   observations: optionalText,
   status: z.enum(["ACTIVE", "INACTIVE", "PROSPECT"]).default("PROSPECT"),
-  source: optionalText,
-  segment: optionalText,
+  source: optionalTitleText(),
+  segment: optionalTitleText(),
   companySize: optionalText,
-  responsible: optionalText,
+  responsible: optionalTitleText(),
   priority: optionalText,
   temperature: optionalText,
   firstPurchaseAt: z.coerce.date().optional().nullable(),
@@ -76,7 +109,7 @@ export const clientSchema = z.object({
   averageTicket: z.coerce.number().nonnegative().optional().nullable(),
   purchasePotential: z.coerce.number().nonnegative().optional().nullable(),
   creditLimit: z.coerce.number().nonnegative().optional().nullable(),
-  paymentTerms: optionalText,
+  paymentTerms: optionalTitleText(),
   preferredPaymentMethod: optionalText,
   billingDay: z.coerce.number().int().min(1).max(31).optional().nullable(),
   financialStatus: optionalText,
