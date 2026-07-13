@@ -8,6 +8,11 @@ const envBoolean = z.preprocess((value: unknown) => {
   return value;
 }, z.boolean());
 
+const optionalEmail = z.preprocess(
+  (value: unknown) => value === "" ? undefined : value,
+  z.string().email().optional()
+);
+
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(3333),
@@ -19,7 +24,7 @@ const envSchema = z.object({
   JWT_EXPIRES_IN: z.string().default("15m"),
   JWT_REFRESH_EXPIRES_IN: z.string().default("7d"),
   APP_EMAIL_HABILITADO: envBoolean.default(false),
-  APP_EMAIL_REMETENTE: z.string().email().optional(),
+  APP_EMAIL_REMETENTE: optionalEmail,
   APP_EMAIL_NOME: z.string().optional(),
   MAIL_HOST: z.string().optional(),
   MAIL_PORT: z.coerce.number().int().positive().optional(),
