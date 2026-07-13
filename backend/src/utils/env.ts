@@ -1,6 +1,13 @@
 import "dotenv/config";
 import { z } from "zod";
 
+const envBoolean = z.preprocess((value: unknown) => {
+  if (typeof value !== "string") return value;
+  if (value.toLowerCase() === "true") return true;
+  if (value.toLowerCase() === "false") return false;
+  return value;
+}, z.boolean());
+
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(3333),
@@ -11,7 +18,7 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(32),
   JWT_EXPIRES_IN: z.string().default("15m"),
   JWT_REFRESH_EXPIRES_IN: z.string().default("7d"),
-  APP_EMAIL_HABILITADO: z.coerce.boolean().default(false),
+  APP_EMAIL_HABILITADO: envBoolean.default(false),
   APP_EMAIL_REMETENTE: z.string().email().optional(),
   APP_EMAIL_NOME: z.string().optional(),
   MAIL_HOST: z.string().optional(),

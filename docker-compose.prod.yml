@@ -35,6 +35,13 @@ services:
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN}
+      APP_EMAIL_HABILITADO: ${APP_EMAIL_HABILITADO:-false}
+      APP_EMAIL_REMETENTE: ${APP_EMAIL_REMETENTE:-}
+      APP_EMAIL_NOME: ${APP_EMAIL_NOME:-HTA Sistemas}
+      MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USER: ${MAIL_USER:-}
+      MAIL_PASS: ${MAIL_PASS:-}
     healthcheck:
       test: ["CMD", "node", "-e", "require(\x27http\x27).get(\x27http://localhost:3333/health\x27,res=>process.exit(res.statusCode===200?0:1)).on(\x27error\x27,()=>process.exit(1))"]
       interval: 10s

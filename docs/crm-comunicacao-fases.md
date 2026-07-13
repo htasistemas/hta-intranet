@@ -79,3 +79,5 @@ O envio usa provider configuravel:
 Quando nao ha provider ativo, o sistema registra envio simulado com identificador `SIM-*`. Isso permite testar fluxo, historico, fila, campanhas e relatorios sem depender de credenciais externas.
 
 Para envio real, configure `endpointUrl`, `apiKey` e remetente na aba `Comunicacao` do CRM.
+
+Para SMTP definido por ambiente, o container do backend deve receber `APP_EMAIL_HABILITADO`, `APP_EMAIL_REMETENTE`, `APP_EMAIL_NOME`, `MAIL_HOST`, `MAIL_PORT`, `MAIL_USER` e `MAIL_PASS`. No Gmail, `MAIL_PASS` deve ser uma senha de app, e nao a senha comum da conta.

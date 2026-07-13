@@ -450,6 +450,12 @@ export default function MessagesPage() {
                   <span className={cn("rounded-full px-3 py-1 text-xs", statusClasses[message.status])}>{statusLabels[message.status]}</span>
                 </div>
                 <p className="mt-3 text-sm text-slate-300">{message.subject ?? message.body.slice(0, 90)}</p>
+                {message.errorMessage ? (
+                  <div className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200" role="alert">
+                    <strong className="block">Motivo da falha</strong>
+                    <span>{message.errorMessage}</span>
+                  </div>
+                ) : null}
                 <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex flex-wrap gap-2 text-xs text-slate-300">
                     <span className="inline-flex items-center gap-1 rounded-full bg-white/5 px-2 py-1"><Mail size={13} /> Envio: {formatDate(message.sentAt)}</span>
