@@ -9,6 +9,7 @@ Implementado:
 - Disparo manual para lead ou cliente.
 - Historico de mensagens no CRM e no Portal 360 do cliente.
 - Status de mensagem: `QUEUED`, `SENDING`, `SENT`, `DELIVERED`, `READ`, `FAILED`.
+- Rastreamento de abertura de e-mail por pixel individual, com primeira abertura, ultima abertura e contador.
 
 Endpoints:
 
@@ -18,6 +19,13 @@ Endpoints:
 - `POST /api/communication/templates`
 - `GET /api/communication/messages`
 - `POST /api/communication/send`
+- `GET /api/communication/track/open/:token.gif` (publico, usado somente pela imagem incorporada ao e-mail)
+
+### Confirmacao de abertura
+
+Cada novo e-mail SMTP inclui uma imagem transparente individual. Quando o cliente permite o carregamento de imagens, a mensagem passa para `READ` e o historico registra a primeira abertura e o total de carregamentos. `EMAIL_TRACKING_BASE_URL` deve apontar para a URL HTTPS publica que encaminha `/api` ao backend. Quando ela nao esta configurada, o sistema usa `FRONTEND_URL`.
+
+O rastreamento nao e uma confirmacao absoluta: clientes de e-mail podem bloquear imagens e provedores como Gmail e Apple podem carregar ou armazenar a imagem em proxy. Por isso, uma abertura pode nao ser registrada ou pode ser registrada automaticamente.
 
 ## Fase 2 - Fila, automacoes e campanhas
 

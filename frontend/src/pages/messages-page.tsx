@@ -52,7 +52,7 @@ const statusLabels: Record<CommunicationStatus, string> = {
   DRAFT: "Rascunho",
   QUEUED: "Na fila",
   SENDING: "Enviando",
-  SENT: "Enviada",
+  SENT: "Aceita pelo servidor",
   DELIVERED: "Entregue",
   READ: "Visualizada",
   FAILED: "Falhou",
@@ -143,7 +143,7 @@ export default function MessagesPage() {
     staleTime: 0
   });
   const templates = useQuery({ queryKey: ["communication-templates"], queryFn: () => api.get<CommunicationTemplate[]>("/communication/templates") });
-  const messages = useQuery({ queryKey: ["communication-messages"], queryFn: () => api.get<CommunicationMessage[]>("/communication/messages") });
+  const messages = useQuery({ queryKey: ["communication-messages"], queryFn: () => api.get<CommunicationMessage[]>("/communication/messages"), refetchInterval: 30_000 });
   const report = useQuery({ queryKey: ["communication-report"], queryFn: () => api.get<CommunicationReport>("/communication/report") });
 
   const templateForm = useForm<TemplateForm>({
@@ -333,7 +333,7 @@ export default function MessagesPage() {
     <div className="space-y-5">
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <Card><p className="text-sm text-slate-400">Mensagens</p><strong className="mt-2 block text-3xl">{stats.total}</strong></Card>
-        <Card><p className="text-sm text-slate-400">Enviadas</p><strong className="mt-2 block text-3xl">{stats.sent}</strong></Card>
+        <Card><p className="text-sm text-slate-400">Aceitas pelo servidor</p><strong className="mt-2 block text-3xl">{stats.sent}</strong></Card>
         <Card><p className="text-sm text-slate-400">Visualizadas</p><strong className="mt-2 block text-3xl">{stats.read}</strong></Card>
         <Card><p className="text-sm text-slate-400">Respostas</p><strong className="mt-2 block text-3xl">{stats.responses}</strong></Card>
         <Card><p className="text-sm text-slate-400">Interacoes</p><strong className="mt-2 block text-3xl">{stats.interactions}</strong></Card>
@@ -453,7 +453,8 @@ export default function MessagesPage() {
                 <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex flex-wrap gap-2 text-xs text-slate-300">
                     <span className="inline-flex items-center gap-1 rounded-full bg-white/5 px-2 py-1"><Mail size={13} /> Envio: {formatDate(message.sentAt)}</span>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-white/5 px-2 py-1"><Eye size={13} /> Leitura: {formatDate(message.readAt)}</span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-white/5 px-2 py-1"><Eye size={13} /> Primeira abertura: {formatDate(message.firstOpenedAt ?? message.readAt)}</span>
+                    {message.openCount > 0 ? <span className="inline-flex items-center gap-1 rounded-full bg-violet-500/15 px-2 py-1 text-violet-200">Aberturas: {message.openCount}</span> : null}
                     <span className="inline-flex items-center gap-1 rounded-full bg-white/5 px-2 py-1"><MessageSquareText size={13} /> Interacoes: {message.webhookEvents?.length ?? 0}</span>
                     {hasResponse(message) ? <span className="rounded-full bg-emerald-500/15 px-2 py-1 text-emerald-200">Houve resposta</span> : null}
                   </div>

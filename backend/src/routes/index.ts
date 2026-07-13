@@ -80,6 +80,7 @@ apiRouter.post("/auth/reset-password", loginLimiter, validateBody(resetPasswordS
 apiRouter.post("/auth/refresh", validateBody(refreshSchema), asyncHandler(auth.refresh));
 apiRouter.post("/auth/logout", validateBody(refreshSchema), asyncHandler(auth.logout));
 apiRouter.get("/google-calendar/callback", asyncHandler(googleCalendar.callback));
+apiRouter.get("/communication/track/open/:token.gif", asyncHandler(communication.trackOpen));
 
 apiRouter.use(requireAuth);
 apiRouter.get("/google-calendar/status", asyncHandler(googleCalendar.status));

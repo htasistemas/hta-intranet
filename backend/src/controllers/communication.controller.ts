@@ -3,6 +3,8 @@ import { z } from "zod";
 import { CommunicationService } from "../services/communication.service.js";
 import { ApiError } from "../utils/api-error.js";
 
+const transparentGif = Buffer.from("R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==", "base64");
+
 function userId(request: Request): string {
   if (!request.auth) throw new ApiError(401, "Nao autenticado.");
   return request.auth.userId;
@@ -43,6 +45,21 @@ export class CommunicationController {
   public messages = async (request: Request, response: Response): Promise<void> => {
     const query = z.object({ clientId: z.string().optional(), leadId: z.string().optional() }).parse(request.query);
     response.json(await this.service.listMessages(userId(request), query.clientId, query.leadId));
+  };
+
+  public trackOpen = async (request: Request, response: Response): Promise<void> => {
+    const trackingToken = z.string().regex(/^[a-f0-9]{64}$/).safeParse(request.params.token);
+    if (trackingToken.success) await this.service.trackOpen(trackingToken.data);
+    response
+      .set({
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+        "Content-Type": "image/gif",
+        "Cross-Origin-Resource-Policy": "cross-origin",
+        Expires: "0",
+        Pragma: "no-cache"
+      })
+      .status(200)
+      .send(transparentGif);
   };
 
   public send = async (request: Request, response: Response): Promise<void> => {

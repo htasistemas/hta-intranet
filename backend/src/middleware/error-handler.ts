@@ -24,6 +24,11 @@ export const errorHandler: ErrorRequestHandler = (error: unknown, _request, resp
     response.status(409).json({ message: "Registro duplicado.", fields: error.meta?.target });
     return;
   }
+  if (error instanceof Prisma.PrismaClientInitializationError) {
+    console.error(error);
+    response.status(503).json({ message: "Banco de dados indisponivel. Tente novamente em instantes." });
+    return;
+  }
   console.error(error);
   response.status(500).json({ message: "Erro interno do servidor." });
 };

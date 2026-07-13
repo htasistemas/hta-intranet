@@ -8,6 +8,7 @@ import type {
 } from "@prisma/client";
 import type SMTPTransport from "nodemailer/lib/smtp-transport/index.js";
 import type { z } from "zod";
+import { randomBytes } from "node:crypto";
 import { differenceInHours } from "date-fns";
 import nodemailer from "nodemailer";
 import { prisma } from "../prisma/client.js";
@@ -55,6 +56,7 @@ const fallbackProvider: Record<CommunicationChannel, CommunicationProvider> = {
   EMAIL: "WEBHOOK",
   WHATSAPP: "WEBHOOK"
 };
+const publicBaseUrl = (env.EMAIL_TRACKING_BASE_URL ?? env.FRONTEND_URL).replace(/\/+$/, "");
 
 function scope(ownerId: string): CrmScope {
   return { ownerId, tenantId: "default" };
@@ -90,7 +92,7 @@ function addressAccepted(result: SMTPTransport.SentMessageInfo, recipient: strin
   return accepted.includes(recipient.toLowerCase());
 }
 
-async function sendSmtp(message: { recipient: string; recipientName: string | null; subject: string | null; body: string }): Promise<string | null> {
+async function sendSmtp(message: { recipient: string; recipientName: string | null; subject: string | null; body: string; trackingToken: string | null }): Promise<string | null> {
   if (!smtpConfigured()) throw new ApiError(500, "Servidor de e-mail SMTP nao configurado.");
   if (env.MAIL_PASS === "trocar_por_app_password") throw new ApiError(500, "Configure MAIL_PASS com a senha de app do Gmail.");
   const host = env.MAIL_HOST;
@@ -111,7 +113,7 @@ async function sendSmtp(message: { recipient: string; recipientName: string | nu
     to: message.recipientName ? { address: message.recipient, name: message.recipientName } : message.recipient,
     subject: message.subject ?? "Contato HTA Sistemas",
     text: message.body,
-    html: message.body.replace(/\n/g, "<br />")
+    html: `${message.body.replace(/\n/g, "<br />")}${message.trackingToken ? `<img src="${publicBaseUrl}/api/communication/track/open/${encodeURIComponent(message.trackingToken)}.gif" width="1" height="1" alt="" style="display:block;width:1px;height:1px;border:0" />` : ""}`
   });
   if (result.rejected.length > 0 || !addressAccepted(result, message.recipient)) {
     throw new ApiError(502, `Servidor SMTP nao aceitou o destinatario ${message.recipient}.`);
@@ -177,6 +179,23 @@ export class CommunicationService {
     });
   }
 
+  public async trackOpen(trackingToken: string): Promise<void> {
+    const message = await prisma.communicationMessage.findUnique({ where: { trackingToken } });
+    if (!message || message.channel !== "EMAIL") return;
+    const openedAt = new Date();
+    await prisma.communicationMessage.update({
+      where: { id: message.id },
+      data: {
+        status: "READ",
+        deliveredAt: message.deliveredAt ?? openedAt,
+        readAt: message.readAt ?? openedAt,
+        firstOpenedAt: message.firstOpenedAt ?? openedAt,
+        lastOpenedAt: openedAt,
+        openCount: { increment: 1 }
+      }
+    });
+  }
+
   public async sendManual(ownerId: string, input: SendInput) {
     const message = await this.createMessage(ownerId, input, "QUEUED");
     await prisma.communicationQueueItem.create({ data: { tenantId: scope(ownerId).tenantId, messageId: message.id, scheduledAt: input.scheduledAt ?? new Date() } });
@@ -200,8 +219,9 @@ export class CommunicationService {
         const result = await this.deliver(item.message);
         await prisma.communicationMessage.update({
           where: { id: item.messageId },
-          data: { status: "SENT", provider: result.provider, providerMessageId: result.providerMessageId, sentAt: new Date(), errorMessage: null }
+          data: { provider: result.provider, providerMessageId: result.providerMessageId, sentAt: new Date(), errorMessage: null }
         });
+        await prisma.communicationMessage.updateMany({ where: { id: item.messageId, status: { not: "READ" } }, data: { status: "SENT" } });
         await prisma.communicationQueueItem.update({ where: { id: item.id }, data: { status: "SENT", processedAt: new Date(), errorMessage: null } });
         processed.push(item.id);
       } catch (error) {
@@ -392,13 +412,14 @@ export class CommunicationService {
         recipient: input.recipient,
         subject,
         body,
+        trackingToken: input.channel === "EMAIL" ? randomBytes(32).toString("hex") : null,
         scheduledAt: input.scheduledAt,
         metadata: { variables }
       }
     });
   }
 
-  private async deliver(message: { channel: CommunicationChannel; recipient: string; recipientName: string | null; subject: string | null; body: string; metadata: Prisma.JsonValue }): Promise<ProviderSendResult> {
+  private async deliver(message: { channel: CommunicationChannel; recipient: string; recipientName: string | null; subject: string | null; body: string; trackingToken: string | null; metadata: Prisma.JsonValue }): Promise<ProviderSendResult> {
     if (message.channel === "EMAIL" && smtpConfigured()) {
       return { provider: "SMTP", providerMessageId: await sendSmtp(message) };
     }

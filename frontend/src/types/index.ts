@@ -95,6 +95,9 @@ export interface ClientCommunicationMessage {
   sentAt: string | null;
   deliveredAt: string | null;
   readAt: string | null;
+  openCount: number;
+  firstOpenedAt: string | null;
+  lastOpenedAt: string | null;
   createdAt: string;
   template?: { id: string; name: string; subject: string | null } | null;
   webhookEvents?: Array<{ id: string; receivedAt: string; status: ClientCommunicationStatus | null }>;

@@ -8,6 +8,7 @@ export const openApiDocument = {
   paths: {
     "/auth/login": { post: { summary: "Autentica usuario" } },
     "/auth/refresh": { post: { summary: "Renova tokens" } },
+    "/communication/track/open/{token}.gif": { get: { summary: "Registra a abertura de um e-mail e retorna um pixel transparente" } },
     "/dashboard": { get: { summary: "Indicadores e graficos", security: [{ bearerAuth: [] }] } },
     "/clients": { get: { summary: "Lista clientes" }, post: { summary: "Cria cliente" } },
     "/clients/{id}": { get: { summary: "Detalhe e historico" }, put: { summary: "Atualiza cliente" }, delete: { summary: "Exclui cliente" } },

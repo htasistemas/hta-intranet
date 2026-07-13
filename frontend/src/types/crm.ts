@@ -220,6 +220,9 @@ export interface CommunicationMessage {
   sentAt: string | null;
   deliveredAt: string | null;
   readAt: string | null;
+  openCount: number;
+  firstOpenedAt: string | null;
+  lastOpenedAt: string | null;
   createdAt: string;
   client?: CrmClient | null;
   lead?: CrmLead | null;

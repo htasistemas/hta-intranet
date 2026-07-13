@@ -1085,6 +1085,10 @@ model CommunicationMessage {
   sentAt            DateTime?
   deliveredAt       DateTime?
   readAt            DateTime?
+  trackingToken     String?                     @unique
+  openCount         Int                         @default(0)
+  firstOpenedAt     DateTime?
+  lastOpenedAt      DateTime?
   attempts          Int                         @default(0)
   metadata          Json                        @default("{}")
   createdAt         DateTime                    @default(now())

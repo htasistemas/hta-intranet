@@ -30,6 +30,7 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
       PORT: 3333
       FRONTEND_URL: https://intranet.htasistemas.com.br
+      EMAIL_TRACKING_BASE_URL: ${EMAIL_TRACKING_BASE_URL:-https://intranet.htasistemas.com.br}
       JWT_SECRET: ${JWT_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}

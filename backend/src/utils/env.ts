@@ -6,6 +6,7 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3333),
   DATABASE_URL: z.string().min(1),
   FRONTEND_URL: z.string().url().default("http://localhost:5173"),
+  EMAIL_TRACKING_BASE_URL: z.string().url().optional(),
   JWT_SECRET: z.string().min(32),
   JWT_REFRESH_SECRET: z.string().min(32),
   JWT_EXPIRES_IN: z.string().default("15m"),
