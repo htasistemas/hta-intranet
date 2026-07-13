@@ -30,6 +30,49 @@ jobs:
           git checkout master
           git merge --ff-only origin/master
 
+      - name: Sincronizar configuracao SMTP protegida
+        working-directory: /home/srv/hta-intranet
+        env:
+          APP_EMAIL_HABILITADO: ${{ secrets.APP_EMAIL_HABILITADO }}
+          APP_EMAIL_REMETENTE: ${{ secrets.APP_EMAIL_REMETENTE }}
+          APP_EMAIL_NOME: ${{ secrets.APP_EMAIL_NOME }}
+          MAIL_HOST: ${{ secrets.MAIL_HOST }}
+          MAIL_PORT: ${{ secrets.MAIL_PORT }}
+          MAIL_USER: ${{ secrets.MAIL_USER }}
+          MAIL_PASS: ${{ secrets.MAIL_PASS }}
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          path = Path(".env.production")
+          keys = (
+              "APP_EMAIL_HABILITADO",
+              "APP_EMAIL_REMETENTE",
+              "APP_EMAIL_NOME",
+              "MAIL_HOST",
+              "MAIL_PORT",
+              "MAIL_USER",
+              "MAIL_PASS",
+          )
+          values = {key: os.environ[key] for key in keys}
+          if any("\n" in value or "\r" in value for value in values.values()):
+              raise SystemExit("Configuracao SMTP invalida.")
+          lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
+          output = []
+          pending = set(keys)
+          for line in lines:
+              key = line.split("=", 1)[0].strip() if "=" in line else ""
+              if key in values:
+                  output.append(f"{key}={values[key]}")
+                  pending.discard(key)
+              else:
+                  output.append(line)
+          output.extend(f"{key}={values[key]}" for key in keys if key in pending)
+          path.write_text("\n".join(output) + "\n", encoding="utf-8")
+          path.chmod(0o600)
+          PY
+
       - name: Validar configuracao
         working-directory: /home/srv/hta-intranet
         run: |
