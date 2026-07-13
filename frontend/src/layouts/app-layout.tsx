@@ -10,6 +10,7 @@ import {
   ContactRound,
   DatabaseBackup,
   Handshake,
+  Network,
   PanelsTopLeft,
   FileBarChart,
   FolderKanban,
@@ -56,6 +57,7 @@ const navigation: NavigationGroup[] = [
       { label: "Clientes ativos", href: "/clientes-ativos", icon: ContactRound },
       { label: "Captacao", href: "/captacao", icon: CircleDot },
       { label: "Produtos", href: "/produtos", icon: Package },
+      { label: "Parceiros", href: "/parceiros", icon: Network },
       { label: "Mensagens", href: "/mensagens", icon: Mail },
       { label: "Projetos", href: "/projetos", icon: FolderKanban }
     ]

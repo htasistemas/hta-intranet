@@ -7,11 +7,12 @@ export class DashboardService {
     const months = Array.from({ length: 6 }, (_, index) => startOfMonth(subMonths(now, 5 - index)));
     const earliestMonth = months[0];
     if (!earliestMonth) throw new Error("Periodo do dashboard invalido.");
-    const [total, active, prospects, inactive, todayAppointments, weekAppointments, pendingTasks, revenue, birthdays, categories, schedules, taskStatuses] = await prisma.$transaction([
+    const [total, active, prospects, inactive, activePartners, todayAppointments, weekAppointments, pendingTasks, revenue, birthdays, categories, schedules, taskStatuses] = await prisma.$transaction([
       prisma.client.count({ where: { ownerId: userId } }),
       prisma.client.count({ where: { ownerId: userId, status: "ACTIVE" } }),
       prisma.client.count({ where: { ownerId: userId, status: "PROSPECT" } }),
       prisma.client.count({ where: { ownerId: userId, status: "INACTIVE" } }),
+      prisma.partner.count({ where: { ownerId: userId, status: "ACTIVE" } }),
       prisma.schedule.count({ where: { userId, startAt: { gte: startOfDay(now), lte: endOfDay(now) } } }),
       prisma.schedule.count({ where: { userId, startAt: { gte: startOfWeek(now), lte: endOfWeek(now) } } }),
       prisma.task.count({ where: { userId, status: { not: "COMPLETED" } } }),
@@ -23,7 +24,7 @@ export class DashboardService {
     ]);
     const clients = await prisma.client.findMany({ where: { ownerId: userId, createdAt: { gte: earliestMonth } }, select: { createdAt: true } });
     return {
-      kpis: { total, active, prospects, inactive, todayAppointments, weekAppointments, pendingTasks, revenue: Number(revenue._sum.expectedValue ?? 0), birthdays },
+      kpis: { total, active, prospects, inactive, activePartners, todayAppointments, weekAppointments, pendingTasks, revenue: Number(revenue._sum.expectedValue ?? 0), birthdays },
       clientsByMonth: months.map((month) => ({ month: format(month, "MMM"), total: clients.filter((client) => format(client.createdAt, "yyyy-MM") === format(month, "yyyy-MM")).length })),
       clientsByCategory: categories.map((category) => ({ name: category.name, total: category._count.clients, color: category.color })),
       appointments: months.map((month) => ({ month: format(month, "MMM"), total: schedules.filter((schedule) => format(schedule.startAt, "yyyy-MM") === format(month, "yyyy-MM")).length })),

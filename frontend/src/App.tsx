@@ -12,6 +12,7 @@ const ProspectingPage = lazy(() => import("@/pages/prospecting-page"));
 const CustomerPortalPage = lazy(() => import("@/pages/customer-portal-page"));
 const ProductsPage = lazy(() => import("@/pages/products-page"));
 const ProjectsPage = lazy(() => import("@/pages/projects-page"));
+const PartnersPage = lazy(() => import("@/pages/partners-page"));
 const MessagesPage = lazy(() => import("@/pages/messages-page"));
 const CalendarPage = lazy(() => import("@/pages/calendar-page"));
 const TasksPage = lazy(() => import("@/pages/tasks-page"));
@@ -38,6 +39,7 @@ export default function App() {
           <Route path="/portal-cliente" element={<CustomerPortalPage />} />
           <Route path="/produtos" element={<ProductsPage />} />
           <Route path="/projetos" element={<ProjectsPage />} />
+          <Route path="/parceiros" element={<PartnersPage />} />
           <Route path="/mensagens" element={<MessagesPage />} />
           <Route path="/agenda" element={<CalendarPage />} />
           <Route path="/tarefas" element={<TasksPage />} />

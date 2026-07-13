@@ -8,6 +8,18 @@ export class AuthController {
     response.json(await this.service.login(request.body));
   };
 
+  public google = async (request: Request, response: Response): Promise<void> => {
+    response.json(await this.service.loginWithGoogle(request.body.credential as string));
+  };
+
+  public forgotPassword = async (request: Request, response: Response): Promise<void> => {
+    response.json(await this.service.requestPasswordReset(request.body.email as string));
+  };
+
+  public resetPassword = async (request: Request, response: Response): Promise<void> => {
+    response.json(await this.service.resetPassword(request.body.token as string, request.body.password as string));
+  };
+
   public refresh = async (request: Request, response: Response): Promise<void> => {
     response.json(await this.service.refresh(request.body.refreshToken as string));
   };

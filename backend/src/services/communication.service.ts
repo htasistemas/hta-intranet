@@ -6,6 +6,7 @@ import type {
   Priority,
   Prisma
 } from "@prisma/client";
+import type SMTPTransport from "nodemailer/lib/smtp-transport/index.js";
 import type { z } from "zod";
 import { differenceInHours } from "date-fns";
 import nodemailer from "nodemailer";
@@ -84,6 +85,11 @@ function smtpConfigured(): boolean {
   return Boolean(env.APP_EMAIL_HABILITADO && env.MAIL_HOST && env.MAIL_PORT && env.MAIL_USER && env.MAIL_PASS && env.APP_EMAIL_REMETENTE);
 }
 
+function addressAccepted(result: SMTPTransport.SentMessageInfo, recipient: string): boolean {
+  const accepted = result.accepted.map((address) => String(address).toLowerCase());
+  return accepted.includes(recipient.toLowerCase());
+}
+
 async function sendSmtp(message: { recipient: string; recipientName: string | null; subject: string | null; body: string }): Promise<string | null> {
   if (!smtpConfigured()) throw new ApiError(500, "Servidor de e-mail SMTP nao configurado.");
   if (env.MAIL_PASS === "trocar_por_app_password") throw new ApiError(500, "Configure MAIL_PASS com a senha de app do Gmail.");
@@ -99,13 +105,17 @@ async function sendSmtp(message: { recipient: string; recipientName: string | nu
     secure: port === 465,
     auth: { user, pass }
   });
+  await transporter.verify();
   const result = await transporter.sendMail({
     from: { address: fromAddress, name: env.APP_EMAIL_NOME ?? fromAddress },
     to: message.recipientName ? { address: message.recipient, name: message.recipientName } : message.recipient,
     subject: message.subject ?? "Contato HTA Sistemas",
     text: message.body,
     html: message.body.replace(/\n/g, "<br />")
-  }) as { messageId?: string };
+  });
+  if (result.rejected.length > 0 || !addressAccepted(result, message.recipient)) {
+    throw new ApiError(502, `Servidor SMTP nao aceitou o destinatario ${message.recipient}.`);
+  }
   return result.messageId ?? null;
 }
 
@@ -396,6 +406,9 @@ export class CommunicationService {
       where: { tenantId: "default", channel: message.channel, active: true, deletedAt: null },
       orderBy: { createdAt: "desc" }
     });
+    if (!config && message.channel === "EMAIL") {
+      throw new ApiError(500, "Envio de e-mail real nao configurado. Configure APP_EMAIL_HABILITADO=true e as variaveis SMTP.");
+    }
     if (!config) return { provider: fallbackProvider[message.channel], providerMessageId: `SIM-${Date.now()}` };
     const providerMessageId = await postProvider(config, {
       channel: message.channel,

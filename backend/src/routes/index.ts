@@ -8,6 +8,7 @@ import { CrmController } from "../controllers/crm.controller.js";
 import { GoogleCalendarController } from "../controllers/google-calendar.controller.js";
 import { CommunicationController } from "../controllers/communication.controller.js";
 import { ProductController } from "../controllers/product.controller.js";
+import { PartnerController } from "../controllers/partner.controller.js";
 import { BackupController } from "../controllers/backup.controller.js";
 import { asyncHandler } from "../utils/async-handler.js";
 import { validateBody } from "../middleware/validate.js";
@@ -34,6 +35,8 @@ import {
   crmLeadImportRequestSchema,
   crmSlaRuleSchema,
   noteSchema,
+  partnerInteractionSchema,
+  partnerSchema,
   clientProductSchema,
   productServiceSchema,
   projectSchema,
@@ -43,7 +46,7 @@ import {
   userCreateSchema,
   userUpdateSchema
 } from "../validations/entities.validation.js";
-import { loginSchema, refreshSchema } from "../validations/auth.validation.js";
+import { forgotPasswordSchema, googleLoginSchema, loginSchema, refreshSchema, resetPasswordSchema } from "../validations/auth.validation.js";
 import { openApiDocument } from "../utils/openapi.js";
 import { SYSTEM_VERSION } from "../utils/version.js";
 
@@ -58,6 +61,7 @@ const crm = new CrmController();
 const googleCalendar = new GoogleCalendarController();
 const communication = new CommunicationController();
 const products = new ProductController();
+const partners = new PartnerController();
 const backups = new BackupController();
 export const apiRouter = Router();
 
@@ -70,6 +74,9 @@ apiRouter.get("/", (_request, response) => response.json({
 }));
 apiRouter.get("/docs", (_request, response) => response.json(openApiDocument));
 apiRouter.post("/auth/login", loginLimiter, validateBody(loginSchema), asyncHandler(auth.login));
+apiRouter.post("/auth/google", loginLimiter, validateBody(googleLoginSchema), asyncHandler(auth.google));
+apiRouter.post("/auth/forgot-password", loginLimiter, validateBody(forgotPasswordSchema), asyncHandler(auth.forgotPassword));
+apiRouter.post("/auth/reset-password", loginLimiter, validateBody(resetPasswordSchema), asyncHandler(auth.resetPassword));
 apiRouter.post("/auth/refresh", validateBody(refreshSchema), asyncHandler(auth.refresh));
 apiRouter.post("/auth/logout", validateBody(refreshSchema), asyncHandler(auth.logout));
 apiRouter.get("/google-calendar/callback", asyncHandler(googleCalendar.callback));
@@ -100,6 +107,12 @@ apiRouter.get("/client-products", asyncHandler(products.listClientProducts));
 apiRouter.post("/client-products", validateBody(clientProductSchema), asyncHandler(products.createClientProduct));
 apiRouter.put("/client-products/:id", validateBody(clientProductSchema), asyncHandler(products.updateClientProduct));
 apiRouter.delete("/client-products/:id", asyncHandler(products.deleteClientProduct));
+apiRouter.get("/partners", asyncHandler(partners.list));
+apiRouter.get("/partners/:id", asyncHandler(partners.get));
+apiRouter.post("/partners", validateBody(partnerSchema), asyncHandler(partners.create));
+apiRouter.put("/partners/:id", validateBody(partnerSchema), asyncHandler(partners.update));
+apiRouter.delete("/partners/:id", asyncHandler(partners.delete));
+apiRouter.post("/partners/:id/interactions", validateBody(partnerInteractionSchema), asyncHandler(partners.createInteraction));
 apiRouter.get("/projects", asyncHandler(projects.list));
 apiRouter.get("/projects/:id", asyncHandler(projects.get));
 apiRouter.post("/projects", validateBody(projectSchema), asyncHandler(projects.create));

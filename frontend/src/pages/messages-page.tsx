@@ -90,8 +90,12 @@ function replaceVariables(value: string, client: Client | undefined): string {
   return Object.entries(clientVariables(client)).reduce((text, [key, variable]) => text.replaceAll(`{{${key}}}`, variable), value);
 }
 
+function clientContactName(client: Client): string {
+  return client.responsible?.trim() || client.name;
+}
+
 function clientVariables(client: Client): Record<string, string> {
-  const contactName = client.responsible ?? "";
+  const contactName = client.responsible?.trim() ?? "";
   return {
     cliente: client.name,
     empresa: client.tradeName ?? client.legalName ?? client.name,
@@ -106,6 +110,10 @@ function clientVariables(client: Client): Record<string, string> {
 function recipientFor(channel: CommunicationChannel, client: Client | undefined): string {
   if (!client) return "";
   return channel === "EMAIL" ? client.email ?? "" : client.whatsapp ?? client.phone ?? "";
+}
+
+function normalizedRecipient(value: string | null | undefined): string {
+  return (value ?? "").replace(/\D/g, "") || (value ?? "").trim().toLowerCase();
 }
 
 function hasResponse(message: CommunicationMessage): boolean {
@@ -204,7 +212,7 @@ export default function MessagesPage() {
         await api.post<CommunicationMessage>("/communication/send", {
           channel: input.channel,
           templateId: input.templateId,
-          recipientName: client.name,
+          recipientName: clientContactName(client),
           recipient,
           subject: replaceVariables(input.subject ?? "", client),
           body: replaceVariables(input.body, client),
@@ -220,6 +228,27 @@ export default function MessagesPage() {
     },
     onError: (error) => toast(error.message, "error")
   });
+  const resendMessage = useMutation({
+    mutationFn: (message: CommunicationMessage) => {
+      const recipient = normalizedRecipient(message.recipient);
+      const activeClient = clientList.find((client) =>
+        [client.email, client.whatsapp, client.phone].some((value) => normalizedRecipient(value) === recipient)
+      );
+      return api.post<CommunicationMessage>("/communication/send", {
+        channel: message.channel,
+        recipientName: activeClient ? clientContactName(activeClient) : message.recipientName ?? message.client?.name ?? message.lead?.name ?? null,
+        recipient: message.recipient,
+        subject: message.subject,
+        body: message.body,
+        variables: activeClient ? clientVariables(activeClient) : {}
+      });
+    },
+    onSuccess: () => {
+      invalidate();
+      toast("Mensagem reenviada ou enfileirada.");
+    },
+    onError: (error) => toast(error.message, "error")
+  });
   const processQueue = useMutation({
     mutationFn: () => api.post<{ processed: number }>("/communication/queue/process", {}),
     onSuccess: (result) => {
@@ -231,7 +260,7 @@ export default function MessagesPage() {
 
   useEffect(() => {
     if (sendMode !== "single" || !selectedClient) return;
-    sendForm.setValue("recipientName", selectedClient.name);
+    sendForm.setValue("recipientName", clientContactName(selectedClient));
     sendForm.setValue("recipient", recipientFor(selectedChannel, selectedClient), { shouldValidate: true });
     sendForm.setValue("subject", replaceVariables(sendForm.getValues("subject") ?? "", selectedClient));
     sendForm.setValue("body", replaceVariables(sendForm.getValues("body"), selectedClient), { shouldValidate: true });
@@ -310,53 +339,6 @@ export default function MessagesPage() {
         <Card><p className="text-sm text-slate-400">Interacoes</p><strong className="mt-2 block text-3xl">{stats.interactions}</strong></Card>
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
-        <Card>
-          <CardTitle>{selectedTemplate ? "Editar mensagem criada" : "Criar mensagem"}</CardTitle>
-          <form className="grid gap-3" onSubmit={(event) => void templateForm.handleSubmit((input) => saveTemplate.mutateAsync(input).then(() => undefined), handleInvalidTemplate)(event)}>
-            <div className="grid gap-3 md:grid-cols-3">
-              <label>
-                <Input placeholder="Nome do modelo" {...templateForm.register("name")} />
-                {templateForm.formState.errors.name ? <small className="text-red-400">{templateForm.formState.errors.name.message}</small> : null}
-              </label>
-              <select className={selectClass} {...templateForm.register("channel")}><option value="EMAIL">E-mail</option><option value="WHATSAPP">WhatsApp</option></select>
-              <Input placeholder="Variaveis: cliente, empresa" {...templateForm.register("variablesText")} />
-            </div>
-            <Input placeholder="Assunto para e-mail" {...templateForm.register("subject")} />
-            <label>
-              <Textarea className="min-h-40" placeholder="Mensagem personalizada" {...templateForm.register("body")} />
-              {templateForm.formState.errors.body ? <small className="text-red-400">{templateForm.formState.errors.body.message}</small> : null}
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {variableOptions.map((variable) => <Button key={variable} type="button" variant="outline" size="sm" onClick={() => insertVariable(variable)}><Plus size={14} /> {`{{${variable}}}`}</Button>)}
-            </div>
-            <div className="flex justify-between gap-3">
-              <Button type="button" variant="ghost" onClick={() => { setSelectedTemplate(undefined); templateForm.reset(); }}>Limpar</Button>
-              <Button type="submit" disabled={saveTemplate.isPending}><Save size={16} /> {selectedTemplate ? "Salvar edicao" : "Incluir mensagem"}</Button>
-            </div>
-          </form>
-        </Card>
-
-        <Card>
-          <CardTitle>Mensagens criadas</CardTitle>
-          <div className="space-y-2">
-            {templates.isLoading ? <Skeleton className="h-32" /> : templates.data?.map((template) => (
-              <div key={template.id} className="rounded-xl border border-slate-700 bg-sidebar p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0"><p className="truncate font-medium">{template.name}</p><p className="text-xs text-slate-400">{template.channel} - {template.variables.join(", ") || "sem variaveis"}</p></div>
-                  <div className="flex shrink-0 gap-1">
-                    <Button variant="ghost" size="icon" onClick={() => useTemplate(template)} aria-label="Usar mensagem"><Copy size={16} /></Button>
-                    <Button variant="ghost" size="icon" onClick={() => editTemplate(template)} aria-label="Editar mensagem"><Edit3 size={16} /></Button>
-                    <Button variant="danger" size="icon" onClick={() => setTemplateToDelete(template)} aria-label="Excluir mensagem"><Trash2 size={16} /></Button>
-                  </div>
-                </div>
-                <p className="mt-3 line-clamp-2 text-sm text-slate-300">{template.body}</p>
-              </div>
-            ))}
-          </div>
-        </Card>
-      </section>
-
       <section className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
         <Card>
           <CardTitle>Enviar para cliente</CardTitle>
@@ -404,6 +386,53 @@ export default function MessagesPage() {
         </Card>
 
         <Card>
+          <CardTitle>{selectedTemplate ? "Editar mensagem criada" : "Criar mensagem"}</CardTitle>
+          <form className="grid gap-3" onSubmit={(event) => void templateForm.handleSubmit((input) => saveTemplate.mutateAsync(input).then(() => undefined), handleInvalidTemplate)(event)}>
+            <div className="grid gap-3 md:grid-cols-3">
+              <label>
+                <Input placeholder="Nome do modelo" {...templateForm.register("name")} />
+                {templateForm.formState.errors.name ? <small className="text-red-400">{templateForm.formState.errors.name.message}</small> : null}
+              </label>
+              <select className={selectClass} {...templateForm.register("channel")}><option value="EMAIL">E-mail</option><option value="WHATSAPP">WhatsApp</option></select>
+              <Input placeholder="Variaveis: cliente, empresa" {...templateForm.register("variablesText")} />
+            </div>
+            <Input placeholder="Assunto para e-mail" {...templateForm.register("subject")} />
+            <label>
+              <Textarea className="min-h-40" placeholder="Mensagem personalizada" {...templateForm.register("body")} />
+              {templateForm.formState.errors.body ? <small className="text-red-400">{templateForm.formState.errors.body.message}</small> : null}
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {variableOptions.map((variable) => <Button key={variable} type="button" variant="outline" size="sm" onClick={() => insertVariable(variable)}><Plus size={14} /> {`{{${variable}}}`}</Button>)}
+            </div>
+            <div className="flex justify-between gap-3">
+              <Button type="button" variant="ghost" onClick={() => { setSelectedTemplate(undefined); templateForm.reset(); }}>Limpar</Button>
+              <Button type="submit" disabled={saveTemplate.isPending}><Save size={16} /> {selectedTemplate ? "Salvar edicao" : "Incluir mensagem"}</Button>
+            </div>
+          </form>
+        </Card>
+
+        <Card className="xl:col-span-2">
+          <CardTitle>Mensagens criadas</CardTitle>
+          <div className="space-y-2">
+            {templates.isLoading ? <Skeleton className="h-32" /> : templates.data?.map((template) => (
+              <div key={template.id} className="rounded-xl border border-slate-700 bg-sidebar p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0"><p className="truncate font-medium">{template.name}</p><p className="text-xs text-slate-400">{template.channel} - {template.variables.join(", ") || "sem variaveis"}</p></div>
+                  <div className="flex shrink-0 gap-1">
+                    <Button variant="ghost" size="icon" onClick={() => useTemplate(template)} aria-label="Usar mensagem"><Copy size={16} /></Button>
+                    <Button variant="ghost" size="icon" onClick={() => editTemplate(template)} aria-label="Editar mensagem"><Edit3 size={16} /></Button>
+                    <Button variant="danger" size="icon" onClick={() => setTemplateToDelete(template)} aria-label="Excluir mensagem"><Trash2 size={16} /></Button>
+                  </div>
+                </div>
+                <p className="mt-3 line-clamp-2 text-sm text-slate-300">{template.body}</p>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </section>
+
+      <section className="grid gap-5">
+        <Card>
           <CardTitle>Historico do cliente e envios</CardTitle>
           <div className="mb-4 grid gap-3 md:grid-cols-3">
             <div className="rounded-xl bg-sidebar p-3"><p className="text-xs text-slate-400">Entregues</p><strong>{stats.delivered}</strong></div>
@@ -421,11 +450,16 @@ export default function MessagesPage() {
                   <span className={cn("rounded-full px-3 py-1 text-xs", statusClasses[message.status])}>{statusLabels[message.status]}</span>
                 </div>
                 <p className="mt-3 text-sm text-slate-300">{message.subject ?? message.body.slice(0, 90)}</p>
-                <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-300">
-                  <span className="inline-flex items-center gap-1 rounded-full bg-white/5 px-2 py-1"><Mail size={13} /> Envio: {formatDate(message.sentAt)}</span>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-white/5 px-2 py-1"><Eye size={13} /> Leitura: {formatDate(message.readAt)}</span>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-white/5 px-2 py-1"><MessageSquareText size={13} /> Interacoes: {message.webhookEvents?.length ?? 0}</span>
-                  {hasResponse(message) ? <span className="rounded-full bg-emerald-500/15 px-2 py-1 text-emerald-200">Houve resposta</span> : null}
+                <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-wrap gap-2 text-xs text-slate-300">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-white/5 px-2 py-1"><Mail size={13} /> Envio: {formatDate(message.sentAt)}</span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-white/5 px-2 py-1"><Eye size={13} /> Leitura: {formatDate(message.readAt)}</span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-white/5 px-2 py-1"><MessageSquareText size={13} /> Interacoes: {message.webhookEvents?.length ?? 0}</span>
+                    {hasResponse(message) ? <span className="rounded-full bg-emerald-500/15 px-2 py-1 text-emerald-200">Houve resposta</span> : null}
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={() => resendMessage.mutate(message)} disabled={resendMessage.isPending}>
+                    <Send size={14} /> Reenviar
+                  </Button>
                 </div>
               </article>
             ))}

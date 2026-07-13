@@ -85,7 +85,7 @@ const schema = z.object({
 });
 
 type Fields = z.infer<typeof schema>;
-type TabId = "identity" | "contact" | "address" | "commercial" | "financial" | "projects" | "lgpd";
+type TabId = "identity" | "contact" | "address" | "commercial" | "financial" | "projects" | "messages" | "lgpd";
 
 const defaults: Fields = {
   name: "",
@@ -144,6 +144,7 @@ const tabs: Array<{ id: TabId; label: string }> = [
   { id: "commercial", label: "Comercial" },
   { id: "financial", label: "Financeiro" },
   { id: "projects", label: "Projetos" },
+  { id: "messages", label: "Mensagens" },
   { id: "lgpd", label: "LGPD" }
 ];
 
@@ -463,6 +464,26 @@ function FieldError({ message }: { message?: string }) {
   return message ? <small className="text-red-400">{message}</small> : null;
 }
 
+const messageStatusLabels = {
+  DRAFT: "Rascunho",
+  QUEUED: "Na fila",
+  SENDING: "Enviando",
+  SENT: "Enviada",
+  DELIVERED: "Entregue",
+  READ: "Visualizada",
+  FAILED: "Falhou",
+  CANCELLED: "Cancelada"
+} as const;
+
+function formatDateTime(value: string | null): string {
+  if (!value) return "-";
+  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
+}
+
+function messagePreview(body: string): string {
+  return body.length > 180 ? `${body.slice(0, 180)}...` : body;
+}
+
 function normalizeText(value: string): string {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
@@ -588,12 +609,20 @@ function ProductSelector({ products, selectedIds, onChange }: { products: Produc
 export function ClientForm({ client, onSave, onCancel }: { client?: Client; onSave: (input: Record<string, unknown>) => Promise<void>; onCancel: () => void }) {
   const [activeTab, setActiveTab] = useState<TabId>("identity");
   const { toast } = useToast();
+  const { data: clientDetails } = useQuery({
+    queryKey: ["client-detail", client?.id],
+    queryFn: () => api.get<Client>(`/clients/${client?.id ?? ""}`),
+    enabled: Boolean(client?.id)
+  });
   const { data: categories = [] } = useQuery({ queryKey: ["categories"], queryFn: () => api.get<Category[]>("/categories") });
   const { data: projectsResult } = useQuery({ queryKey: ["projects", "client-form"], queryFn: () => api.get<PageResult<Project>>("/projects?pageSize=100") });
   const { data: productsResult } = useQuery({ queryKey: ["products", "client-form"], queryFn: () => api.get<PageResult<ProductService>>("/products?pageSize=100") });
   const projects = projectsResult?.data ?? [];
   const products = productsResult?.data ?? [];
-  const values = useMemo(() => clientValues(client), [client]);
+  const currentClient = clientDetails ?? client;
+  const messages = currentClient?.communicationMessages ?? [];
+  const latestMessage = messages[0];
+  const values = useMemo(() => clientValues(currentClient), [currentClient]);
   const { register, control, handleSubmit, setValue, getValues, formState: { errors, isSubmitting } } = useForm<Fields>({ resolver: zodResolver(schema), values });
   const type = useWatch({ control, name: "type" });
   const isCompany = type === "COMPANY";
@@ -785,6 +814,51 @@ export function ClientForm({ client, onSave, onCancel }: { client?: Client; onSa
                 <Controller control={control} name="productIds" render={({ field }) => <ProductSelector products={products} selectedIds={field.value} onChange={field.onChange} />} />
               </div>
             </fieldset>
+          )}
+
+          {activeTab === "messages" && (
+            <section className="space-y-4">
+              <div className="rounded-xl border border-slate-700 bg-sidebar p-4">
+                <p className="text-sm font-medium">Ultima mensagem enviada</p>
+                {latestMessage ? (
+                  <div className="mt-3 space-y-2">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <p className="font-semibold">{latestMessage.subject || latestMessage.template?.name || latestMessage.channel}</p>
+                        <p className="text-xs text-slate-400">{latestMessage.channel} para {latestMessage.recipient} em {formatDateTime(latestMessage.sentAt ?? latestMessage.createdAt)}</p>
+                      </div>
+                      <span className="w-fit rounded-full bg-emerald-500/15 px-3 py-1 text-xs text-emerald-200">{messageStatusLabels[latestMessage.status]}</span>
+                    </div>
+                    <p className="whitespace-pre-wrap text-sm text-slate-300">{messagePreview(latestMessage.body)}</p>
+                    {latestMessage.errorMessage ? <p className="text-xs text-red-300">{latestMessage.errorMessage}</p> : null}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-sm text-slate-400">Nenhuma mensagem enviada para este cliente.</p>
+                )}
+              </div>
+
+              <div className="rounded-xl border border-slate-700 bg-sidebar p-4">
+                <p className="mb-3 text-sm font-medium">Historico recente de mensagens</p>
+                {messages.length ? (
+                  <div className="space-y-2">
+                    {messages.map((message) => (
+                      <article key={message.id} className="rounded-xl border border-slate-700/70 bg-card p-3">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium">{message.subject || message.template?.name || message.body.slice(0, 64)}</p>
+                            <p className="text-xs text-slate-400">{message.channel} - {formatDateTime(message.sentAt ?? message.createdAt)} - {message.recipient}</p>
+                          </div>
+                          <span className="w-fit rounded-full bg-white/5 px-2 py-1 text-xs text-slate-300">{messageStatusLabels[message.status]}</span>
+                        </div>
+                        <p className="mt-2 line-clamp-2 text-sm text-slate-300">{message.body}</p>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-400">O historico sera exibido apos o primeiro envio por e-mail ou WhatsApp.</p>
+                )}
+              </div>
+            </section>
           )}
 
           {activeTab === "lgpd" && (

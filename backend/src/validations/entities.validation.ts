@@ -250,6 +250,46 @@ export const clientProductSchema = z.object({
   notes: optionalText
 });
 
+export const partnerSchema = z.object({
+  name: z.string().trim().min(2).transform(normalizeTitleText),
+  company: optionalTitleText(),
+  document: optionalText,
+  type: z.enum(["REFERRAL", "RESELLER", "IMPLEMENTATION", "STRATEGIC", "AFFILIATE"]).default("REFERRAL"),
+  status: z.enum(["ACTIVE", "INACTIVE", "PROSPECTING", "SUSPENDED"]).default("PROSPECTING"),
+  contactName: optionalTitleText(),
+  email: z.string().trim().toLowerCase().email().optional().nullable().or(z.literal("")),
+  phone: optionalText,
+  whatsapp: optionalText,
+  website: optionalLowerText(),
+  city: optionalTitleText(),
+  state: optionalUpperText(),
+  segment: optionalTitleText(),
+  commissionModel: z.enum(["ONE_TIME", "RECURRING", "REVENUE_SHARE", "PROJECT_BASED", "HYBRID"]).default("ONE_TIME"),
+  commissionPercent: z.coerce.number().min(0).max(100).optional().nullable(),
+  recurringMonths: z.coerce.number().int().min(0).max(120).optional().nullable(),
+  fixedAmount: z.coerce.number().nonnegative().optional().nullable(),
+  closeBonus: z.coerce.number().nonnegative().optional().nullable(),
+  paymentTrigger: optionalText,
+  contractStart: z.coerce.date().optional().nullable(),
+  contractEnd: z.coerce.date().optional().nullable(),
+  goals: optionalText,
+  strengths: optionalText,
+  rules: optionalText,
+  notes: optionalText,
+  projectIds: z.array(z.string()).default([])
+}).refine((data) => !data.contractStart || !data.contractEnd || data.contractEnd >= data.contractStart, {
+  message: "Fim do contrato deve ocorrer apos o inicio.",
+  path: ["contractEnd"]
+});
+
+export const partnerInteractionSchema = z.object({
+  type: z.enum(["CALL", "EMAIL", "MEETING", "WHATSAPP", "NOTE", "TRAINING", "PROPOSAL", "REVIEW"]).default("NOTE"),
+  title: z.string().trim().min(2),
+  description: optionalText,
+  occurredAt: z.coerce.date().optional().nullable(),
+  nextStep: optionalText
+});
+
 export const crmLeadSchema = z.object({
   name: z.string().trim().min(2),
   company: optionalText,

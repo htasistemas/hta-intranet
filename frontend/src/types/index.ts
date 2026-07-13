@@ -6,6 +6,12 @@ export type ProductType = "PRODUCT" | "SERVICE" | "SUBSCRIPTION" | "LICENSE" | "
 export type ProductStatus = "ACTIVE" | "INACTIVE";
 export type ClientProductStatus = "ACTIVE" | "SUSPENDED" | "CANCELLED" | "EXPIRED";
 export type UserRole = "ADMIN" | "MANAGER" | "USER";
+export type ClientCommunicationStatus = "DRAFT" | "QUEUED" | "SENDING" | "SENT" | "DELIVERED" | "READ" | "FAILED" | "CANCELLED";
+export type ClientCommunicationChannel = "EMAIL" | "WHATSAPP";
+export type PartnerType = "REFERRAL" | "RESELLER" | "IMPLEMENTATION" | "STRATEGIC" | "AFFILIATE";
+export type PartnerStatus = "ACTIVE" | "INACTIVE" | "PROSPECTING" | "SUSPENDED";
+export type CommissionModel = "ONE_TIME" | "RECURRING" | "REVENUE_SHARE" | "PROJECT_BASED" | "HYBRID";
+export type PartnerInteractionType = "CALL" | "EMAIL" | "MEETING" | "WHATSAPP" | "NOTE" | "TRAINING" | "PROPOSAL" | "REVIEW";
 
 export interface UserAccount {
   id: string;
@@ -74,6 +80,24 @@ export interface Client {
   projectLinks?: Array<{ project: Project }>;
   projects?: Project[];
   products?: ClientProduct[];
+  communicationMessages?: ClientCommunicationMessage[];
+}
+
+export interface ClientCommunicationMessage {
+  id: string;
+  channel: ClientCommunicationChannel;
+  status: ClientCommunicationStatus;
+  recipientName: string | null;
+  recipient: string;
+  subject: string | null;
+  body: string;
+  errorMessage: string | null;
+  sentAt: string | null;
+  deliveredAt: string | null;
+  readAt: string | null;
+  createdAt: string;
+  template?: { id: string; name: string; subject: string | null } | null;
+  webhookEvents?: Array<{ id: string; receivedAt: string; status: ClientCommunicationStatus | null }>;
 }
 
 export interface Schedule {
@@ -144,6 +168,51 @@ export interface ProductService {
   _count?: { clientProducts: number; projects: number };
 }
 
+export interface Partner {
+  id: string;
+  name: string;
+  company: string | null;
+  document: string | null;
+  type: PartnerType;
+  status: PartnerStatus;
+  contactName: string | null;
+  email: string | null;
+  phone: string | null;
+  whatsapp: string | null;
+  website: string | null;
+  city: string | null;
+  state: string | null;
+  segment: string | null;
+  commissionModel: CommissionModel;
+  commissionPercent: string | number | null;
+  recurringMonths: number | null;
+  fixedAmount: string | number | null;
+  closeBonus: string | number | null;
+  paymentTrigger: string | null;
+  contractStart: string | null;
+  contractEnd: string | null;
+  goals: string | null;
+  strengths: string | null;
+  rules: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  projectLinks?: Array<{ project: Project }>;
+  interactions?: PartnerInteraction[];
+  _count?: { projectLinks: number; interactions: number };
+}
+
+export interface PartnerInteraction {
+  id: string;
+  partnerId: string;
+  type: PartnerInteractionType;
+  title: string;
+  description: string | null;
+  occurredAt: string;
+  nextStep: string | null;
+  createdAt: string;
+}
+
 export interface ClientProduct {
   id: string;
   clientId: string;
@@ -164,6 +233,7 @@ export interface DashboardData {
     active: number;
     prospects: number;
     inactive: number;
+    activePartners: number;
     todayAppointments: number;
     weekAppointments: number;
     pendingTasks: number;

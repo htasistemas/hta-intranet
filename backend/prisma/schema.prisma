@@ -77,6 +77,40 @@ enum ProductStatus {
   INACTIVE
 }
 
+enum PartnerType {
+  REFERRAL
+  RESELLER
+  IMPLEMENTATION
+  STRATEGIC
+  AFFILIATE
+}
+
+enum PartnerStatus {
+  ACTIVE
+  INACTIVE
+  PROSPECTING
+  SUSPENDED
+}
+
+enum CommissionModel {
+  ONE_TIME
+  RECURRING
+  REVENUE_SHARE
+  PROJECT_BASED
+  HYBRID
+}
+
+enum PartnerInteractionType {
+  CALL
+  EMAIL
+  MEETING
+  WHATSAPP
+  NOTE
+  TRAINING
+  PROPOSAL
+  REVIEW
+}
+
 enum ClientProductStatus {
   ACTIVE
   SUSPENDED
@@ -245,6 +279,7 @@ model User {
   notes                    Note[]
   auditLogs                AuditLog[]
   refreshTokens            RefreshToken[]
+  passwordResetTokens      PasswordResetToken[]
   attachments              Attachment[]
   projects                 Project[]
   googleCalendarConnection GoogleCalendarConnection?
@@ -263,6 +298,8 @@ model User {
   crmSlaRules              CrmSlaRule[]
   products                 ProductService[]
   clientProducts           ClientProduct[]
+  partners                 Partner[]
+  partnerInteractions      PartnerInteraction[]
 
   @@map("usuarios")
 }
@@ -507,6 +544,7 @@ model Project {
   updatedAt   DateTime        @updatedAt
   tasks       Task[]
   clientLinks ClientProject[]
+  partnerLinks PartnerProject[]
   schedules   Schedule[]
 
   @@index([ownerId, status])
@@ -576,6 +614,74 @@ model ClientProject {
 
   @@id([clientId, projectId])
   @@map("clientes_projetos")
+}
+
+model Partner {
+  id                   String               @id @default(cuid())
+  ownerId              String
+  owner                User                 @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name                 String
+  company              String?
+  document             String?
+  type                 PartnerType          @default(REFERRAL)
+  status               PartnerStatus        @default(PROSPECTING)
+  contactName          String?
+  email                String?
+  phone                String?
+  whatsapp             String?
+  website              String?
+  city                 String?
+  state                String?
+  segment              String?
+  commissionModel      CommissionModel      @default(ONE_TIME)
+  commissionPercent    Decimal?             @db.Decimal(8, 2)
+  recurringMonths      Int?
+  fixedAmount          Decimal?             @db.Decimal(12, 2)
+  closeBonus           Decimal?             @db.Decimal(12, 2)
+  paymentTrigger       String?
+  contractStart        DateTime?
+  contractEnd          DateTime?
+  goals                String?
+  strengths            String?
+  rules                String?
+  notes                String?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  projectLinks         PartnerProject[]
+  interactions         PartnerInteraction[]
+
+  @@index([ownerId, status])
+  @@index([ownerId, name])
+  @@map("parceiros")
+}
+
+model PartnerProject {
+  partnerId  String
+  projectId  String
+  partner    Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@id([partnerId, projectId])
+  @@map("parceiros_projetos")
+}
+
+model PartnerInteraction {
+  id          String                 @id @default(cuid())
+  partnerId   String
+  partner     Partner                @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  ownerId     String
+  owner       User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  type        PartnerInteractionType @default(NOTE)
+  title       String
+  description String?
+  occurredAt  DateTime               @default(now())
+  nextStep    String?
+  createdAt   DateTime               @default(now())
+
+  @@index([partnerId, occurredAt])
+  @@index([ownerId, occurredAt])
+  @@map("parceiros_interacoes")
 }
 
 model Note {
@@ -649,6 +755,19 @@ model RefreshToken {
 
   @@index([userId])
   @@map("tokens_renovacao")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@map("tokens_redefinicao_senha")
 }
 
 model CrmLead {

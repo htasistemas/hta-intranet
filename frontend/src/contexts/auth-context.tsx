@@ -5,6 +5,9 @@ import type { Session } from "@/types";
 interface AuthContextValue {
   session: Session | null;
   login: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: (credential: string) => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  resetPassword: (token: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -17,12 +20,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     storeSession(result);
     setSession(result);
   };
+  const loginWithGoogle = async (credential: string): Promise<void> => {
+    const result = await api.post<Session>("/auth/google", { credential });
+    storeSession(result);
+    setSession(result);
+  };
+  const requestPasswordReset = async (email: string): Promise<void> => {
+    await api.post<{ sent: boolean }>("/auth/forgot-password", { email });
+  };
+  const resetPassword = async (token: string, password: string): Promise<void> => {
+    await api.post<{ reset: boolean }>("/auth/reset-password", { token, password });
+  };
   const logout = async (): Promise<void> => {
     if (session) await api.post<void>("/auth/logout", { refreshToken: session.refreshToken }).catch(() => undefined);
     storeSession(null);
     setSession(null);
   };
-  const value = useMemo(() => ({ session, login, logout }), [session]);
+  const value = useMemo(() => ({ session, login, loginWithGoogle, requestPasswordReset, resetPassword, logout }), [session]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

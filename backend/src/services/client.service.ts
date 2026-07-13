@@ -8,6 +8,9 @@ import { ApiError } from "../utils/api-error.js";
 import { prisma } from "../prisma/client.js";
 
 type ClientInput = z.infer<typeof clientSchema>;
+type ClientWithCommunicationMessages = NonNullable<Awaited<ReturnType<ClientRepository["findById"]>>> & {
+  communicationMessages: Awaited<ReturnType<typeof prisma.communicationMessage.findMany>>;
+};
 
 interface ClientImportRowError {
   row: number;
@@ -30,6 +33,17 @@ function clientInternalCode(input: ClientInput): string | null | undefined {
   return input.internalCode?.trim() || undefined;
 }
 
+function messageRecipients(client: { email: string | null; phone: string | null; whatsapp: string | null }): string[] {
+  const values = [client.email, client.phone, client.whatsapp]
+    .filter((value): value is string => Boolean(value?.trim()))
+    .flatMap((value) => {
+      const digits = value.replace(/\D/g, "");
+      return digits && digits !== value ? [value, digits] : [value];
+    })
+    .map((value) => value.trim().toLowerCase());
+  return [...new Set(values)];
+}
+
 export class ClientService {
   public constructor(
     private readonly repository = new ClientRepository(),
@@ -43,7 +57,20 @@ export class ClientService {
   public async get(id: string, userId: string) {
     const client = await this.repository.findById(id, userId);
     if (!client) throw new ApiError(404, "Cliente nao encontrado.");
-    return client;
+    const recipients = messageRecipients(client);
+    const communicationMessages = recipients.length
+      ? await prisma.communicationMessage.findMany({
+        where: {
+          ownerId: userId,
+          deletedAt: null,
+          recipient: { in: recipients }
+        },
+        include: { template: true, webhookEvents: { orderBy: { receivedAt: "desc" } } },
+        orderBy: { createdAt: "desc" },
+        take: 10
+      })
+      : [];
+    return { ...client, communicationMessages } satisfies ClientWithCommunicationMessages;
   }
 
   public async create(input: ClientInput, userId: string) {
