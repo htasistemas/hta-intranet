@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Edit3, LayoutGrid, List, Mail, Plus, Printer, Search, Trash2, TrendingUp, Upload, UserCheck } from "lucide-react";
+import { Edit3, Filter, LayoutGrid, List, Mail, Plus, Printer, Search, Trash2, TrendingUp, Upload, UserCheck, X } from "lucide-react";
 import { api } from "@/services/api";
 import type { PageResult } from "@/types";
-import type { CrmLead, CrmLeadCityStat, CrmLeadImportResult, CrmLeadScore, CrmLeadStats, CrmLeadStatus } from "@/types/crm";
+import type { CrmLead, CrmLeadCityStat, CrmLeadImportResult, CrmLeadScore, CrmLeadStats, CrmLeadStatus, CrmRegistrationStatus } from "@/types/crm";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -33,6 +33,18 @@ const scoreLabels: Record<CrmLeadScore, string> = {
   COLD: "Frio"
 };
 
+const registrationLabels: Record<CrmRegistrationStatus, string> = {
+  COMPLETE: "Completo",
+  INCOMPLETE: "Incompleto",
+  UPDATING: "Atualizando"
+};
+
+type PriorityFilter = "" | "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+type StatusFilter = "" | CrmLeadStatus;
+type RegistrationFilter = "" | CrmRegistrationStatus;
+
+const filterSelectClass = "h-11 rounded-xl border border-slate-700 bg-sidebar px-3 text-sm text-slate-200 outline-none focus:border-accent";
+
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
@@ -49,6 +61,9 @@ function printableValue(value: string | number | null | undefined): string {
 
 export default function ProspectingPage() {
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("");
+  const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("");
+  const [registrationFilter, setRegistrationFilter] = useState<RegistrationFilter>("");
   const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
   const [opened, setOpened] = useState(false);
   const [importOpened, setImportOpened] = useState(false);
@@ -57,11 +72,28 @@ export default function ProspectingPage() {
   const [leadToEmail, setLeadToEmail] = useState<CrmLead | undefined>();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { data, isLoading } = useQuery({ queryKey: ["crm-leads", "prospecting", search], queryFn: () => api.get<PageResult<CrmLead>>(`/crm/leads?pageSize=100&search=${encodeURIComponent(search)}`) });
+  const { data, isLoading } = useQuery({
+    queryKey: ["crm-leads", "prospecting", search, statusFilter, priorityFilter, registrationFilter],
+    queryFn: () => {
+      const params = new URLSearchParams({ pageSize: "100" });
+      if (search.trim()) params.set("search", search.trim());
+      if (statusFilter) params.set("status", statusFilter);
+      if (priorityFilter) params.set("priority", priorityFilter);
+      if (registrationFilter) params.set("registrationStatus", registrationFilter);
+      return api.get<PageResult<CrmLead>>(`/crm/leads?${params.toString()}`);
+    }
+  });
   const cityStats = useQuery({ queryKey: ["crm-lead-cities"], queryFn: () => api.get<CrmLeadCityStat[]>("/crm/leads/cities") });
   const leadStats = useQuery({ queryKey: ["crm-lead-stats"], queryFn: () => api.get<CrmLeadStats>("/crm/leads/stats") });
   const leads = data?.data ?? [];
   const cities = cityStats.data ?? [];
+  const hasActiveFilters = Boolean(statusFilter || priorityFilter || registrationFilter);
+
+  const clearFilters = (): void => {
+    setStatusFilter("");
+    setPriorityFilter("");
+    setRegistrationFilter("");
+  };
 
   const printVisibleLeads = (): void => {
     if (!leads.length) {
@@ -227,6 +259,34 @@ export default function ProspectingPage() {
         <Button onClick={() => { setSelected(undefined); setOpened(true); }}><Plus size={17} /> Nova captacao</Button>
       </div>
 
+      <Card className="p-4">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+          <div className="flex min-w-40 items-center gap-2 text-sm font-medium"><Filter size={17} className="text-accent" /> Filtrar captações</div>
+          <div className="grid flex-1 gap-3 sm:grid-cols-3">
+            <label className="grid gap-1 text-xs text-slate-400">Status
+              <select className={filterSelectClass} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}>
+                <option value="">Todos os status</option>
+                {Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </label>
+            <label className="grid gap-1 text-xs text-slate-400">Prioridade
+              <select className={filterSelectClass} value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value as PriorityFilter)}>
+                <option value="">Todas as prioridades</option>
+                <option value="LOW">Baixa</option><option value="MEDIUM">Média</option><option value="HIGH">Alta</option><option value="URGENT">Urgente</option>
+              </select>
+            </label>
+            <label className="grid gap-1 text-xs text-slate-400">Cadastro
+              <select className={filterSelectClass} value={registrationFilter} onChange={(event) => setRegistrationFilter(event.target.value as RegistrationFilter)}>
+                <option value="">Todos os cadastros</option>
+                <option value="COMPLETE">Completo</option><option value="INCOMPLETE">Incompleto</option><option value="UPDATING">Atualizando</option>
+              </select>
+            </label>
+          </div>
+          <Button type="button" variant="ghost" onClick={clearFilters} disabled={!hasActiveFilters}><X size={16} /> Limpar filtros</Button>
+        </div>
+        <p className="mt-3 text-xs text-slate-400">{data?.total ?? 0} contato(s) encontrado(s) com os critérios selecionados.</p>
+      </Card>
+
       {isLoading ? <Skeleton className="h-96" /> : (
         viewMode === "cards" ? (
           <section className="grid gap-4 xl:grid-cols-3">
@@ -247,6 +307,7 @@ export default function ProspectingPage() {
                 <p className="mt-4 text-2xl font-semibold">{currency(Number(lead.estimatedValue ?? 0))}</p>
                 <div className="mt-4 flex flex-wrap gap-2 text-xs">
                   <span className="rounded-full bg-accent/10 px-2 py-1 text-accent">{statusLabels[lead.status]}</span>
+                  <span className={cn("rounded-full px-2 py-1", lead.registrationStatus === "COMPLETE" ? "bg-emerald-500/15 text-emerald-200" : "bg-slate-500/15 text-slate-300")}>{registrationLabels[lead.registrationStatus]}</span>
                   <span className="rounded-full bg-amber-500/15 px-2 py-1 text-amber-200">{scoreLabels[lead.score]}</span>
                   <span className="rounded-full bg-blue-500/15 px-2 py-1 text-blue-200">{lead.source ?? "Origem nao informada"}</span>
                 </div>
@@ -268,7 +329,7 @@ export default function ProspectingPage() {
                   <td className="p-4"><p className="font-medium">{lead.name}</p><p className="text-xs text-slate-400">{lead.company ?? lead.segment ?? "Sem empresa"}</p></td>
                   <td><p>{lead.email ?? "-"}</p><p className="text-xs text-slate-400">{lead.whatsapp ?? lead.phone ?? ""}</p></td>
                   <td>{[lead.city, lead.state].filter(Boolean).join(" / ") || "-"}</td>
-                  <td><div className="flex flex-wrap gap-2"><span className="rounded-full bg-accent/10 px-2 py-1 text-xs text-accent">{statusLabels[lead.status]}</span><span className="rounded-full bg-amber-500/15 px-2 py-1 text-xs text-amber-200">{scoreLabels[lead.score]}</span></div></td>
+                  <td><div className="flex flex-wrap gap-2"><span className="rounded-full bg-accent/10 px-2 py-1 text-xs text-accent">{statusLabels[lead.status]}</span><span className={cn("rounded-full px-2 py-1 text-xs", lead.registrationStatus === "COMPLETE" ? "bg-emerald-500/15 text-emerald-200" : "bg-slate-500/15 text-slate-300")}>{registrationLabels[lead.registrationStatus]}</span></div></td>
                   <td>{currency(Number(lead.estimatedValue ?? 0))}</td>
                   <td>{lead.responsible}</td>
                   <td>

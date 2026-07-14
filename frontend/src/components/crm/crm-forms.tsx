@@ -1,8 +1,8 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import { useState } from "react";
-import { Controller, useForm, type Path, type SubmitErrorHandler, type UseFormRegister } from "react-hook-form";
+import { useEffect, useState } from "react";
+import { Controller, useForm, useWatch, type Path, type SubmitErrorHandler, type UseFormRegister } from "react-hook-form";
 import { z } from "zod";
 import { api } from "@/services/api";
 import { Button } from "@/components/ui/button";
@@ -44,6 +44,8 @@ export const leadFormSchema = z.object({
   estimatedValue: optionalCurrency,
   observations: optionalText,
   score: z.enum(["VERY_HOT", "HOT", "WARM", "COLD"]),
+  registrationStatus: z.enum(["COMPLETE", "INCOMPLETE", "UPDATING"]),
+  registrationStatusManual: z.boolean(),
   priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]),
   status: z.enum(["NEW", "IN_SERVICE", "QUALIFIED", "PROPOSAL_SENT", "NEGOTIATION", "WON", "LOST"]),
   stage: z.enum(["LEAD_RECEIVED", "FIRST_CONTACT", "QUALIFICATION", "DEMONSTRATION", "PROPOSAL_SENT", "NEGOTIATION", "APPROVAL", "IMPLEMENTATION", "SALE_COMPLETED", "LOST"]),
@@ -179,6 +181,7 @@ const leadFieldTabs: Partial<Record<keyof LeadFormValues, LeadTabId>> = {
   estimatedValue: "commercial",
   observations: "notes",
   score: "identity",
+  registrationStatus: "identity",
   priority: "identity",
   status: "identity",
   stage: "commercial",
@@ -268,6 +271,8 @@ export function LeadForm({ lead, onCancel, onSave }: { lead?: CrmLead; onCancel:
       estimatedValue: numberToCurrencyInput(lead?.estimatedValue),
       observations: lead?.observations ?? "",
       score: lead?.score ?? "WARM",
+      registrationStatus: lead?.registrationStatus ?? "INCOMPLETE",
+      registrationStatusManual: lead?.registrationStatusManual ?? false,
       priority: lead?.priority ?? "MEDIUM",
       status: lead?.status ?? "NEW",
       stage: lead?.stage ?? "LEAD_RECEIVED",
@@ -276,6 +281,17 @@ export function LeadForm({ lead, onCancel, onSave }: { lead?: CrmLead; onCancel:
       nextFollowUpAt: dateInput(lead?.nextFollowUpAt)
     }
   });
+
+  const watchedLead = useWatch({ control });
+  const registrationStatusManual = watchedLead.registrationStatusManual ?? false;
+
+  useEffect(() => {
+    if (registrationStatusManual) return;
+    const hasPhone = Boolean(String(watchedLead.phone ?? "").trim() || String(watchedLead.whatsapp ?? "").trim());
+    const requiredValues = [watchedLead.name, watchedLead.company, watchedLead.document, watchedLead.segment, watchedLead.email, watchedLead.city, watchedLead.state, watchedLead.responsible];
+    const complete = hasPhone && requiredValues.every((value) => String(value ?? "").trim().length > 0);
+    setValue("registrationStatus", complete ? "COMPLETE" : "INCOMPLETE", { shouldDirty: true });
+  }, [registrationStatusManual, setValue, watchedLead.city, watchedLead.company, watchedLead.document, watchedLead.email, watchedLead.name, watchedLead.phone, watchedLead.responsible, watchedLead.segment, watchedLead.state, watchedLead.whatsapp]);
 
   const cepLookup = useMutation({
     mutationFn: lookupLeadCep,
@@ -327,7 +343,15 @@ export function LeadForm({ lead, onCancel, onSave }: { lead?: CrmLead; onCancel:
           </div>
           <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[520px]">
             <SelectField label="Status" name="status" register={register} options={[{ value: "NEW", label: "Novo" }, { value: "IN_SERVICE", label: "Em Atendimento" }, { value: "QUALIFIED", label: "Qualificado" }, { value: "PROPOSAL_SENT", label: "Proposta Enviada" }, { value: "NEGOTIATION", label: "Negociacao" }, { value: "WON", label: "Fechado Ganho" }, { value: "LOST", label: "Fechado Perdido" }]} />
-            <SelectField label="Temperatura" name="score" register={register} options={[{ value: "VERY_HOT", label: "Muito Quente" }, { value: "HOT", label: "Quente" }, { value: "WARM", label: "Morno" }, { value: "COLD", label: "Frio" }]} />
+            <label className="space-y-1 text-sm text-slate-300">
+              <span>Cadastro</span>
+              <select className={selectClass} {...register("registrationStatus", { onChange: () => setValue("registrationStatusManual", true, { shouldDirty: true }) })}>
+                <option value="COMPLETE">Completo</option><option value="INCOMPLETE">Incompleto</option><option value="UPDATING">Atualizando</option>
+              </select>
+              <button type="button" className="block text-xs text-accent hover:underline" onClick={() => setValue("registrationStatusManual", false, { shouldDirty: true })}>
+                {registrationStatusManual ? "Reativar avaliação automática" : "Avaliação automática ativa"}
+              </button>
+            </label>
             <SelectField label="Prioridade" name="priority" register={register} options={[{ value: "LOW", label: "Baixa" }, { value: "MEDIUM", label: "Media" }, { value: "HIGH", label: "Alta" }, { value: "URGENT", label: "Urgente" }]} />
           </div>
         </div>

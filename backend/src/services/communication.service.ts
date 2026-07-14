@@ -63,11 +63,30 @@ function scope(ownerId: string): CrmScope {
 }
 
 function renderTemplate(value: string, variables: Record<string, string | number | boolean | null>): string {
-  return Object.entries(variables).reduce((text, [key, variable]) => text.replaceAll(`{{${key}}}`, String(variable ?? "")), value);
+  const rendered = Object.entries(variables).reduce((text, [key, variable]) => text.replaceAll(`{{${key}}}`, String(variable ?? "")), value);
+  const unresolvedVariables = [...rendered.matchAll(/{{\s*([\w-]+)\s*}}/g)].map((match) => match[1]).filter((key): key is string => Boolean(key));
+  if (unresolvedVariables.length > 0) {
+    throw new ApiError(400, `Variaveis sem valor no template: ${[...new Set(unresolvedVariables)].join(", ")}.`);
+  }
+  return rendered;
 }
 
-function clientVariables(client: { name: string; company: string | null; email: string | null; whatsapp: string | null }): Record<string, string | number | boolean | null> {
-  return { cliente: client.name, empresa: client.company, email: client.email, whatsapp: client.whatsapp };
+function clientVariables(client: { name: string; company: string | null; email: string | null; whatsapp: string | null; city: string | null }): Record<string, string | number | boolean | null> {
+  return { cliente: client.name, contato: client.name, empresa: client.company ?? client.name, email: client.email, whatsapp: client.whatsapp, cidade: client.city };
+}
+
+function leadVariables(lead: { name: string; company: string | null; email: string | null; whatsapp: string | null; city: string | null; responsible: string }): Record<string, string | number | boolean | null> {
+  const contactName = lead.responsible.trim() && lead.responsible.toLowerCase() !== "nao informado" ? lead.responsible.trim() : lead.name;
+  return {
+    cliente: lead.name,
+    lead: lead.name,
+    contato: contactName,
+    empresa: lead.company ?? lead.name,
+    email: lead.email,
+    whatsapp: lead.whatsapp,
+    cidade: lead.city,
+    responsavel: lead.responsible
+  };
 }
 
 async function postProvider(config: { endpointUrl: string | null; apiKeyEncrypted: string | null; metadata: Prisma.JsonValue }, payload: Record<string, unknown>): Promise<string | null> {
@@ -395,7 +414,7 @@ export class CommunicationService {
     const template = input.templateId ? await prisma.communicationTemplate.findFirst({ where: { id: input.templateId, ...scope(ownerId), deletedAt: null } }) : null;
     const client = input.clientId ? await prisma.crmClient.findFirst({ where: { id: input.clientId, ...scope(ownerId), deletedAt: null } }) : null;
     const lead = input.leadId ? await prisma.crmLead.findFirst({ where: { id: input.leadId, ...scope(ownerId), deletedAt: null } }) : null;
-    const variables = { ...(client ? clientVariables(client) : {}), lead: lead?.name ?? null, empresa: client?.company ?? lead?.company ?? null, ...input.variables };
+    const variables = { ...(client ? clientVariables(client) : {}), ...(lead ? leadVariables(lead) : {}), ...input.variables };
     const body = template ? renderTemplate(template.body, variables) : renderTemplate(input.body, variables);
     const subject = input.channel === "EMAIL" ? renderTemplate(input.subject ?? template?.subject ?? "Contato comercial", variables) : null;
     return prisma.communicationMessage.create({

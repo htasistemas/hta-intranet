@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
-import type { CrmLeadStatus, CrmPipelineStage, CrmProjectStatus } from "@prisma/client";
+import type { CrmLeadStatus, CrmPipelineStage, CrmProjectStatus, CrmRegistrationStatus } from "@prisma/client";
 import { CrmService } from "../services/crm.service.js";
 import { querySchema } from "../utils/pagination.js";
 import { ApiError } from "../utils/api-error.js";
@@ -19,7 +19,8 @@ const crmLeadFilterSchema = z.object({
   stage: z.enum(["LEAD_RECEIVED", "FIRST_CONTACT", "QUALIFICATION", "DEMONSTRATION", "PROPOSAL_SENT", "NEGOTIATION", "APPROVAL", "IMPLEMENTATION", "SALE_COMPLETED", "LOST"]).optional(),
   responsible: z.string().optional(),
   source: z.string().optional(),
-  priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).optional()
+  priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).optional(),
+  registrationStatus: z.enum(["COMPLETE", "INCOMPLETE", "UPDATING"]).optional()
 });
 
 const crmProjectFilterSchema = z.object({
@@ -70,7 +71,8 @@ export class CrmController {
     const result = await this.service.listLeads(userId(request), query, {
       ...filters,
       status: filters.status as CrmLeadStatus | undefined,
-      stage: filters.stage as CrmPipelineStage | undefined
+      stage: filters.stage as CrmPipelineStage | undefined,
+      registrationStatus: filters.registrationStatus as CrmRegistrationStatus | undefined
     });
     response.json({ ...result, page: query.page, pageSize: query.pageSize });
   };

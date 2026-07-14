@@ -304,6 +304,12 @@ model User {
   @@map("usuarios")
 }
 
+enum CrmRegistrationStatus {
+  COMPLETE
+  INCOMPLETE
+  UPDATING
+}
+
 model Client {
   id            String          @id @default(cuid())
   ownerId       String
@@ -800,6 +806,8 @@ model CrmLead {
   estimatedValue    Decimal?               @db.Decimal(12, 2)
   observations      String?
   score             CrmLeadScore           @default(WARM)
+  registrationStatus CrmRegistrationStatus @default(INCOMPLETE)
+  registrationStatusManual Boolean          @default(false)
   priority          Priority               @default(MEDIUM)
   status            CrmLeadStatus          @default(NEW)
   stage             CrmPipelineStage       @default(LEAD_RECEIVED)

@@ -29,6 +29,13 @@ type ProjectInput = z.infer<typeof crmProjectSchema>;
 type ProjectTaskInput = z.infer<typeof crmProjectTaskSchema>;
 type AutomationInput = z.infer<typeof crmAutomationSchema>;
 
+function automaticRegistrationStatus(input: LeadInput): "COMPLETE" | "INCOMPLETE" | "UPDATING" {
+  if (input.registrationStatusManual) return input.registrationStatus;
+  const hasPhone = Boolean(input.phone?.trim() || input.whatsapp?.trim());
+  const requiredValues = [input.name, input.company, input.document, input.segment, input.email, input.city, input.state, input.responsible];
+  return hasPhone && requiredValues.every((value) => value?.trim()) ? "COMPLETE" : "INCOMPLETE";
+}
+
 interface CrmLeadImportRowError {
   row: number;
   name?: string;
@@ -180,6 +187,7 @@ export class CrmService {
     const currentScope = scope(ownerId);
     const lead = await this.repository.createLead({
       ...input,
+      registrationStatus: automaticRegistrationStatus(input),
       email: normalizeEmail(input.email),
       tenantId: currentScope.tenantId,
       owner: { connect: { id: ownerId } }
@@ -218,6 +226,7 @@ export class CrmService {
       const created = await prisma.crmLead.createMany({
         data: chunk.map((lead) => ({
           ...lead,
+          registrationStatus: automaticRegistrationStatus(lead),
           email: normalizeEmail(lead.email),
           tenantId: currentScope.tenantId,
           ownerId
@@ -233,6 +242,7 @@ export class CrmService {
     const current = await this.getLead(id, ownerId);
     const lead = await this.repository.updateLead(id, {
       ...input,
+      registrationStatus: automaticRegistrationStatus(input),
       email: normalizeEmail(input.email),
       wonAt: input.status === "WON" ? current.wonAt ?? new Date() : current.wonAt,
       lostAt: input.status === "LOST" ? current.lostAt ?? new Date() : current.lostAt

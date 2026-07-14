@@ -1,6 +1,7 @@
 import type { Priority } from "@/types";
 
 export type CrmLeadScore = "VERY_HOT" | "HOT" | "WARM" | "COLD";
+export type CrmRegistrationStatus = "COMPLETE" | "INCOMPLETE" | "UPDATING";
 export type CrmLeadStatus = "NEW" | "IN_SERVICE" | "QUALIFIED" | "PROPOSAL_SENT" | "NEGOTIATION" | "WON" | "LOST";
 export type CrmPipelineStage = "LEAD_RECEIVED" | "FIRST_CONTACT" | "QUALIFICATION" | "DEMONSTRATION" | "PROPOSAL_SENT" | "NEGOTIATION" | "APPROVAL" | "IMPLEMENTATION" | "SALE_COMPLETED" | "LOST";
 export type CrmActivityType = "CALL" | "EMAIL" | "WHATSAPP" | "MEETING" | "STATUS_CHANGE" | "PROPOSAL" | "CONTRACT" | "TASK" | "NOTE" | "VISIT" | "DEMONSTRATION" | "FOLLOW_UP" | "IMPLEMENTATION" | "TRAINING";
@@ -42,6 +43,8 @@ export interface CrmLead {
   estimatedValue: string | number | null;
   observations: string | null;
   score: CrmLeadScore;
+  registrationStatus: CrmRegistrationStatus;
+  registrationStatusManual: boolean;
   priority: Priority;
   status: CrmLeadStatus;
   stage: CrmPipelineStage;

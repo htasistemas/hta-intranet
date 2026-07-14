@@ -61,6 +61,7 @@ export function LeadEmailDialog({ lead, onClose }: { lead?: CrmLead; onClose: ()
   const send = useMutation({
     mutationFn: async (input: EmailInput) => {
       if (!lead?.email) throw new Error("Esta captação não possui um e-mail válido.");
+      const contactName = lead.responsible.trim() && lead.responsible.toLowerCase() !== "nao informado" ? lead.responsible.trim() : lead.name;
       const message = await api.post<CommunicationMessage>("/communication/send", {
         channel: "EMAIL",
         leadId: lead.id,
@@ -69,7 +70,16 @@ export function LeadEmailDialog({ lead, onClose }: { lead?: CrmLead; onClose: ()
         templateId: input.templateId || null,
         subject: input.subject,
         body: input.body,
-        variables: { cliente: lead.name, lead: lead.name, empresa: lead.company }
+        variables: {
+          cliente: lead.name,
+          lead: lead.name,
+          contato: contactName,
+          empresa: lead.company ?? lead.name,
+          email: lead.email,
+          whatsapp: lead.whatsapp,
+          cidade: lead.city,
+          responsavel: lead.responsible
+        }
       });
       if (message.status === "FAILED") throw new Error(message.errorMessage ?? "Não foi possível enviar o e-mail.");
       return message;

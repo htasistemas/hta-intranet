@@ -314,6 +314,8 @@ export const crmLeadSchema = z.object({
   estimatedValue: z.coerce.number().nonnegative().optional().nullable(),
   observations: optionalText,
   score: z.enum(["VERY_HOT", "HOT", "WARM", "COLD"]).default("WARM"),
+  registrationStatus: z.enum(["COMPLETE", "INCOMPLETE", "UPDATING"]).default("INCOMPLETE"),
+  registrationStatusManual: z.boolean().default(false),
   priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).default("MEDIUM"),
   status: z.enum(["NEW", "IN_SERVICE", "QUALIFIED", "PROPOSAL_SENT", "NEGOTIATION", "WON", "LOST"]).default("NEW"),
   stage: z.enum(["LEAD_RECEIVED", "FIRST_CONTACT", "QUALIFICATION", "DEMONSTRATION", "PROPOSAL_SENT", "NEGOTIATION", "APPROVAL", "IMPLEMENTATION", "SALE_COMPLETED", "LOST"]).default("LEAD_RECEIVED"),

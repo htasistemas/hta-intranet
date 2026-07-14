@@ -1,4 +1,4 @@
-import type { CrmLeadStatus, CrmPipelineStage, CrmProjectStatus, Prisma } from "@prisma/client";
+import type { CrmLeadStatus, CrmPipelineStage, CrmProjectStatus, CrmRegistrationStatus, Prisma } from "@prisma/client";
 import { prisma } from "../prisma/client.js";
 import { pagination, type ListQuery } from "../utils/pagination.js";
 
@@ -34,6 +34,7 @@ export interface CrmLeadFilters {
   responsible?: string;
   source?: string;
   priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+  registrationStatus?: CrmRegistrationStatus;
 }
 
 export interface CrmProjectFilters {
@@ -52,6 +53,7 @@ export class CrmRepository {
       ...(filters.responsible ? { responsible: { contains: filters.responsible, mode: "insensitive" } } : {}),
       ...(filters.source ? { source: { contains: filters.source, mode: "insensitive" } } : {}),
       ...(filters.priority ? { priority: filters.priority } : {}),
+      ...(filters.registrationStatus ? { registrationStatus: filters.registrationStatus } : {}),
       ...(query.search ? {
         OR: [
           { name: { startsWith: query.search, mode: "insensitive" } },
