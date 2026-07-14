@@ -317,12 +317,12 @@ export default function ProspectingPage() {
           <section className="grid gap-4 xl:grid-cols-3">
             {leads.map((lead) => (
               <Card key={lead.id} className="cursor-pointer" onClick={() => { setSelected(lead); setOpened(true); }}>
-                <div className="flex items-start justify-between gap-3">
+                <div>
                   <div className="min-w-0">
-                    <h2 className="truncate font-semibold">{lead.name}</h2>
-                    <p className="truncate text-sm text-slate-400">{lead.company ?? lead.email ?? "Sem empresa"}</p>
+                    <h2 className="break-words text-base font-semibold leading-6">{lead.name}</h2>
+                    <p className="mt-1 break-words text-sm text-slate-400">{lead.company ?? lead.email ?? "Sem empresa"}</p>
                   </div>
-                  <div className="flex shrink-0 gap-1" onClick={(event) => event.stopPropagation()}>
+                  <div className="mt-4 flex flex-wrap items-center gap-1 border-t border-slate-700/60 pt-3" onClick={(event) => event.stopPropagation()}>
                     <Button type="button" variant="ghost" size="icon" onClick={() => setLeadToHistory(lead)} aria-label="Ver histórico"><History size={16} /></Button>
                     <Button type="button" variant="ghost" size="icon" onClick={() => setLeadToEmail(lead)} disabled={!lead.email} aria-label={lead.email ? "Enviar e-mail" : "Captação sem e-mail"}><Mail size={16} /></Button>
                     <Button type="button" variant="outline" size="sm" onClick={() => activateClient.mutate(lead.id)} disabled={activateClient.isPending} aria-label="Ativar como cliente"><UserCheck size={16} /> Ativar</Button>
