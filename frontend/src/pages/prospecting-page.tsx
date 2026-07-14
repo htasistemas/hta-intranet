@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Edit3, LayoutGrid, List, Plus, Printer, Search, Trash2, TrendingUp, Upload, UserCheck } from "lucide-react";
+import { Edit3, LayoutGrid, List, Mail, Plus, Printer, Search, Trash2, TrendingUp, Upload, UserCheck } from "lucide-react";
 import { api } from "@/services/api";
 import type { PageResult } from "@/types";
 import type { CrmLead, CrmLeadCityStat, CrmLeadImportResult, CrmLeadScore, CrmLeadStats, CrmLeadStatus } from "@/types/crm";
@@ -11,6 +11,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LeadImportDialog } from "@/components/crm/lead-import-dialog";
+import { LeadEmailDialog } from "@/components/crm/lead-email-dialog";
 import { LeadForm, type LeadFormInput } from "@/components/crm/crm-forms";
 import { useToast } from "@/contexts/toast-context";
 import { cn, currency } from "@/lib/utils";
@@ -53,6 +54,7 @@ export default function ProspectingPage() {
   const [importOpened, setImportOpened] = useState(false);
   const [selected, setSelected] = useState<CrmLead | undefined>();
   const [leadToDelete, setLeadToDelete] = useState<CrmLead | undefined>();
+  const [leadToEmail, setLeadToEmail] = useState<CrmLead | undefined>();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { data, isLoading } = useQuery({ queryKey: ["crm-leads", "prospecting", search], queryFn: () => api.get<PageResult<CrmLead>>(`/crm/leads?pageSize=100&search=${encodeURIComponent(search)}`) });
@@ -236,6 +238,7 @@ export default function ProspectingPage() {
                     <p className="truncate text-sm text-slate-400">{lead.company ?? lead.email ?? "Sem empresa"}</p>
                   </div>
                   <div className="flex shrink-0 gap-1" onClick={(event) => event.stopPropagation()}>
+                    <Button type="button" variant="ghost" size="icon" onClick={() => setLeadToEmail(lead)} disabled={!lead.email} aria-label={lead.email ? "Enviar e-mail" : "Captação sem e-mail"}><Mail size={16} /></Button>
                     <Button type="button" variant="outline" size="sm" onClick={() => activateClient.mutate(lead.id)} disabled={activateClient.isPending} aria-label="Ativar como cliente"><UserCheck size={16} /> Ativar</Button>
                     <Button type="button" variant="ghost" size="icon" onClick={() => { setSelected(lead); setOpened(true); }} aria-label="Editar captacao"><Edit3 size={16} /></Button>
                     <Button type="button" variant="danger" size="icon" onClick={() => setLeadToDelete(lead)} disabled={remove.isPending} aria-label="Excluir captacao"><Trash2 size={16} /></Button>
@@ -270,6 +273,7 @@ export default function ProspectingPage() {
                   <td>{lead.responsible}</td>
                   <td>
                     <div className="flex justify-end gap-1 pr-3">
+                      <Button type="button" variant="ghost" size="icon" onClick={() => setLeadToEmail(lead)} disabled={!lead.email} aria-label={lead.email ? "Enviar e-mail" : "Captação sem e-mail"}><Mail size={16} /></Button>
                       <Button type="button" variant="outline" size="sm" onClick={() => activateClient.mutate(lead.id)} disabled={activateClient.isPending} aria-label="Ativar como cliente"><UserCheck size={16} /> Ativar</Button>
                       <Button type="button" variant="ghost" size="icon" onClick={() => { setSelected(lead); setOpened(true); }} aria-label="Editar captacao"><Edit3 size={16} /></Button>
                       <Button type="button" variant="danger" size="icon" onClick={() => setLeadToDelete(lead)} disabled={remove.isPending} aria-label="Excluir captacao"><Trash2 size={16} /></Button>
@@ -286,6 +290,7 @@ export default function ProspectingPage() {
         <LeadForm lead={selected} onCancel={() => setOpened(false)} onSave={(input) => save.mutateAsync(input).then(() => undefined)} />
       </Dialog>
       <LeadImportDialog open={importOpened} onClose={() => setImportOpened(false)} onImported={handleImported} />
+      <LeadEmailDialog lead={leadToEmail} onClose={() => setLeadToEmail(undefined)} />
       <ConfirmDialog
         open={Boolean(leadToDelete)}
         title="Excluir captacao"

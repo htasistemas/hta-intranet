@@ -6,7 +6,9 @@ const prisma = new PrismaClient();
 
 async function seed(): Promise<void> {
   const adminEmail = "adrianomtorresbr@gmail.com";
-  const passwordHash = await bcrypt.hash("Admin@123", 12);
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD;
+  if (!adminPassword) throw new Error("SEED_ADMIN_PASSWORD deve ser configurada para executar o seed.");
+  const passwordHash = await bcrypt.hash(adminPassword, 12);
   const existingAdmin = await prisma.user.findUnique({ where: { email: adminEmail } });
   const legacyAdmin = await prisma.user.findUnique({ where: { email: "admin@clientflow.com" } });
   if (!existingAdmin && legacyAdmin) {
