@@ -247,19 +247,18 @@ export class CrmService {
       wonAt: input.status === "WON" ? current.wonAt ?? new Date() : current.wonAt,
       lostAt: input.status === "LOST" ? current.lostAt ?? new Date() : current.lostAt
     });
-    if (current.status !== input.status || current.stage !== input.stage) {
-      await this.repository.createActivity({
-        tenantId: scope(ownerId).tenantId,
-        owner: { connect: { id: ownerId } },
-        lead: { connect: { id } },
-        type: "STATUS_CHANGE",
-        status: "COMPLETED",
-        title: `Status atualizado para ${input.status}`,
-        responsible: input.responsible,
-        completedAt: new Date(),
-        metadata: { fromStatus: current.status, toStatus: input.status, fromStage: current.stage, toStage: input.stage }
-      });
-    }
+    const statusChanged = current.status !== input.status || current.stage !== input.stage;
+    await this.repository.createActivity({
+      tenantId: scope(ownerId).tenantId,
+      owner: { connect: { id: ownerId } },
+      lead: { connect: { id } },
+      type: "STATUS_CHANGE",
+      status: "COMPLETED",
+      title: statusChanged ? `Status atualizado para ${input.status}` : "Cadastro atualizado",
+      responsible: input.responsible,
+      completedAt: new Date(),
+      metadata: { source: "leadEdit", fromStatus: current.status, toStatus: input.status, fromStage: current.stage, toStage: input.stage }
+    });
     return lead;
   }
 

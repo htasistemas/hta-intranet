@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Edit3, Filter, LayoutGrid, List, Mail, Plus, Printer, Search, Trash2, TrendingUp, Upload, UserCheck, X } from "lucide-react";
+import { Edit3, Filter, History, LayoutGrid, List, Mail, Plus, Printer, Search, Trash2, TrendingUp, Upload, UserCheck, X } from "lucide-react";
 import { api } from "@/services/api";
 import type { PageResult } from "@/types";
 import type { CrmLead, CrmLeadCityStat, CrmLeadImportResult, CrmLeadScore, CrmLeadStats, CrmLeadStatus, CrmRegistrationStatus } from "@/types/crm";
@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LeadImportDialog } from "@/components/crm/lead-import-dialog";
 import { LeadEmailDialog } from "@/components/crm/lead-email-dialog";
+import { LeadHistoryDialog } from "@/components/crm/lead-history-dialog";
 import { LeadForm, type LeadFormInput } from "@/components/crm/crm-forms";
 import { useToast } from "@/contexts/toast-context";
 import { cn, currency } from "@/lib/utils";
@@ -42,6 +43,7 @@ const registrationLabels: Record<CrmRegistrationStatus, string> = {
 type PriorityFilter = "" | "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 type StatusFilter = "" | CrmLeadStatus;
 type RegistrationFilter = "" | CrmRegistrationStatus;
+type RelationshipFilter = "" | "MESSAGED" | "CONTACTED" | "UPDATED" | "WITH_HISTORY";
 
 const filterSelectClass = "h-11 rounded-xl border border-slate-700 bg-sidebar px-3 text-sm text-slate-200 outline-none focus:border-accent";
 
@@ -59,27 +61,43 @@ function printableValue(value: string | number | null | undefined): string {
   return String(value);
 }
 
+function lastMovement(lead: CrmLead): { label: string; date: string } | null {
+  const message = lead.messages?.[0];
+  const activity = lead.activities?.[0];
+  const messageDate = message ? new Date(message.sentAt ?? message.createdAt).getTime() : 0;
+  const activityDate = activity ? new Date(activity.completedAt ?? activity.createdAt).getTime() : 0;
+  const updatedDate = new Date(lead.updatedAt).getTime();
+  const wasUpdatedAfterCreation = updatedDate - new Date(lead.createdAt).getTime() > 1_000;
+  if (message && messageDate >= activityDate && messageDate >= updatedDate) return { label: message.channel === "EMAIL" ? "Último e-mail" : "Última mensagem", date: message.sentAt ?? message.createdAt };
+  if (activity && activityDate >= updatedDate) return { label: activity.title, date: activity.completedAt ?? activity.createdAt };
+  if (wasUpdatedAfterCreation) return { label: "Última atualização", date: lead.updatedAt };
+  return null;
+}
+
 export default function ProspectingPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("");
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("");
   const [registrationFilter, setRegistrationFilter] = useState<RegistrationFilter>("");
+  const [relationshipFilter, setRelationshipFilter] = useState<RelationshipFilter>("");
   const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
   const [opened, setOpened] = useState(false);
   const [importOpened, setImportOpened] = useState(false);
   const [selected, setSelected] = useState<CrmLead | undefined>();
   const [leadToDelete, setLeadToDelete] = useState<CrmLead | undefined>();
   const [leadToEmail, setLeadToEmail] = useState<CrmLead | undefined>();
+  const [leadToHistory, setLeadToHistory] = useState<CrmLead | undefined>();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { data, isLoading } = useQuery({
-    queryKey: ["crm-leads", "prospecting", search, statusFilter, priorityFilter, registrationFilter],
+    queryKey: ["crm-leads", "prospecting", search, statusFilter, priorityFilter, registrationFilter, relationshipFilter],
     queryFn: () => {
       const params = new URLSearchParams({ pageSize: "100" });
       if (search.trim()) params.set("search", search.trim());
       if (statusFilter) params.set("status", statusFilter);
       if (priorityFilter) params.set("priority", priorityFilter);
       if (registrationFilter) params.set("registrationStatus", registrationFilter);
+      if (relationshipFilter) params.set("relationship", relationshipFilter);
       return api.get<PageResult<CrmLead>>(`/crm/leads?${params.toString()}`);
     }
   });
@@ -87,12 +105,13 @@ export default function ProspectingPage() {
   const leadStats = useQuery({ queryKey: ["crm-lead-stats"], queryFn: () => api.get<CrmLeadStats>("/crm/leads/stats") });
   const leads = data?.data ?? [];
   const cities = cityStats.data ?? [];
-  const hasActiveFilters = Boolean(statusFilter || priorityFilter || registrationFilter);
+  const hasActiveFilters = Boolean(statusFilter || priorityFilter || registrationFilter || relationshipFilter);
 
   const clearFilters = (): void => {
     setStatusFilter("");
     setPriorityFilter("");
     setRegistrationFilter("");
+    setRelationshipFilter("");
   };
 
   const printVisibleLeads = (): void => {
@@ -262,7 +281,7 @@ export default function ProspectingPage() {
       <Card className="p-4">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
           <div className="flex min-w-40 items-center gap-2 text-sm font-medium"><Filter size={17} className="text-accent" /> Filtrar captações</div>
-          <div className="grid flex-1 gap-3 sm:grid-cols-3">
+          <div className="grid flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <label className="grid gap-1 text-xs text-slate-400">Status
               <select className={filterSelectClass} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}>
                 <option value="">Todos os status</option>
@@ -279,6 +298,12 @@ export default function ProspectingPage() {
               <select className={filterSelectClass} value={registrationFilter} onChange={(event) => setRegistrationFilter(event.target.value as RegistrationFilter)}>
                 <option value="">Todos os cadastros</option>
                 <option value="COMPLETE">Completo</option><option value="INCOMPLETE">Incompleto</option><option value="UPDATING">Atualizando</option>
+              </select>
+            </label>
+            <label className="grid gap-1 text-xs text-slate-400">Relacionamento
+              <select className={filterSelectClass} value={relationshipFilter} onChange={(event) => setRelationshipFilter(event.target.value as RelationshipFilter)}>
+                <option value="">Todos os contatos</option>
+                <option value="MESSAGED">Com mensagem enviada</option><option value="CONTACTED">Com contato realizado</option><option value="UPDATED">Cadastro atualizado</option><option value="WITH_HISTORY">Com qualquer histórico</option>
               </select>
             </label>
           </div>
@@ -298,6 +323,7 @@ export default function ProspectingPage() {
                     <p className="truncate text-sm text-slate-400">{lead.company ?? lead.email ?? "Sem empresa"}</p>
                   </div>
                   <div className="flex shrink-0 gap-1" onClick={(event) => event.stopPropagation()}>
+                    <Button type="button" variant="ghost" size="icon" onClick={() => setLeadToHistory(lead)} aria-label="Ver histórico"><History size={16} /></Button>
                     <Button type="button" variant="ghost" size="icon" onClick={() => setLeadToEmail(lead)} disabled={!lead.email} aria-label={lead.email ? "Enviar e-mail" : "Captação sem e-mail"}><Mail size={16} /></Button>
                     <Button type="button" variant="outline" size="sm" onClick={() => activateClient.mutate(lead.id)} disabled={activateClient.isPending} aria-label="Ativar como cliente"><UserCheck size={16} /> Ativar</Button>
                     <Button type="button" variant="ghost" size="icon" onClick={() => { setSelected(lead); setOpened(true); }} aria-label="Editar captacao"><Edit3 size={16} /></Button>
@@ -315,6 +341,7 @@ export default function ProspectingPage() {
                   <TrendingUp size={14} />
                   <span>{lead.segment ?? "Segmento nao informado"} - {lead.responsible}</span>
                 </div>
+                {lastMovement(lead) ? <p className="mt-3 border-t border-slate-700 pt-3 text-xs text-slate-400">{lastMovement(lead)?.label}: {new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(lastMovement(lead)?.date ?? ""))}</p> : <p className="mt-3 border-t border-slate-700 pt-3 text-xs text-slate-500">Sem histórico de contato</p>}
               </Card>
             ))}
           </section>
@@ -334,6 +361,7 @@ export default function ProspectingPage() {
                   <td>{lead.responsible}</td>
                   <td>
                     <div className="flex justify-end gap-1 pr-3">
+                      <Button type="button" variant="ghost" size="icon" onClick={() => setLeadToHistory(lead)} aria-label="Ver histórico"><History size={16} /></Button>
                       <Button type="button" variant="ghost" size="icon" onClick={() => setLeadToEmail(lead)} disabled={!lead.email} aria-label={lead.email ? "Enviar e-mail" : "Captação sem e-mail"}><Mail size={16} /></Button>
                       <Button type="button" variant="outline" size="sm" onClick={() => activateClient.mutate(lead.id)} disabled={activateClient.isPending} aria-label="Ativar como cliente"><UserCheck size={16} /> Ativar</Button>
                       <Button type="button" variant="ghost" size="icon" onClick={() => { setSelected(lead); setOpened(true); }} aria-label="Editar captacao"><Edit3 size={16} /></Button>
@@ -352,6 +380,7 @@ export default function ProspectingPage() {
       </Dialog>
       <LeadImportDialog open={importOpened} onClose={() => setImportOpened(false)} onImported={handleImported} />
       <LeadEmailDialog lead={leadToEmail} onClose={() => setLeadToEmail(undefined)} />
+      <LeadHistoryDialog lead={leadToHistory} onClose={() => setLeadToHistory(undefined)} />
       <ConfirmDialog
         open={Boolean(leadToDelete)}
         title="Excluir captacao"

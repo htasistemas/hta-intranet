@@ -5,6 +5,7 @@ import { pagination, type ListQuery } from "../utils/pagination.js";
 const leadInclude = {
   client: true,
   activities: { where: { deletedAt: null }, orderBy: { createdAt: "desc" }, take: 8 },
+  messages: { where: { deletedAt: null }, orderBy: { createdAt: "desc" }, take: 1 },
   proposals: { where: { deletedAt: null }, orderBy: { createdAt: "desc" } }
 } satisfies Prisma.CrmLeadInclude;
 
@@ -35,6 +36,7 @@ export interface CrmLeadFilters {
   source?: string;
   priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
   registrationStatus?: CrmRegistrationStatus;
+  relationship?: "MESSAGED" | "CONTACTED" | "UPDATED" | "WITH_HISTORY";
 }
 
 export interface CrmProjectFilters {
@@ -44,8 +46,20 @@ export interface CrmProjectFilters {
 
 export class CrmRepository {
   public async listLeads(scope: CrmScope, query: ListQuery, filters: CrmLeadFilters): Promise<{ data: unknown[]; total: number }> {
+    const successfulMessage: Prisma.CommunicationMessageWhereInput = { status: { in: ["SENT", "DELIVERED", "READ"] }, deletedAt: null };
+    const contactActivity: Prisma.CrmActivityWhereInput = { type: { in: ["CALL", "EMAIL", "WHATSAPP", "MEETING", "VISIT", "FOLLOW_UP", "DEMONSTRATION"] }, deletedAt: null };
+    const relationshipWhere: Prisma.CrmLeadWhereInput = filters.relationship === "MESSAGED"
+      ? { messages: { some: successfulMessage } }
+      : filters.relationship === "CONTACTED"
+        ? { OR: [{ messages: { some: successfulMessage } }, { activities: { some: contactActivity } }] }
+        : filters.relationship === "UPDATED"
+          ? { activities: { some: { title: "Cadastro atualizado", deletedAt: null } } }
+          : filters.relationship === "WITH_HISTORY"
+            ? { OR: [{ messages: { some: successfulMessage } }, { activities: { some: { deletedAt: null } } }] }
+            : {};
     const where: Prisma.CrmLeadWhereInput = {
       ...scope,
+      ...relationshipWhere,
       deletedAt: null,
       convertedAt: null,
       ...(filters.status ? { status: filters.status } : {}),

@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Copy, Edit3, Eye, Mail, MessageSquareText, Plus, Save, Search, Send, Trash2 } from "lucide-react";
+import { Copy, Edit3, Eye, Mail, MessageSquareText, Save, Search, Send, Trash2 } from "lucide-react";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { api } from "@/services/api";
@@ -129,6 +129,7 @@ function formatDate(value: string | null): string {
 }
 
 export default function MessagesPage() {
+  const templateBodyRef = useRef<HTMLTextAreaElement | null>(null);
   const [search, setSearch] = useState("");
   const [sendMode, setSendMode] = useState<SendMode>("single");
   const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
@@ -300,7 +301,19 @@ export default function MessagesPage() {
 
   function insertVariable(variable: string): void {
     const body = templateForm.getValues("body");
-    templateForm.setValue("body", `${body} {{${variable}}}`, { shouldValidate: true });
+    const textarea = templateBodyRef.current;
+    const cursor = textarea?.selectionStart ?? body.length;
+    const placeholder = `{{${variable}}}`;
+    const separator = cursor > 0 && body[cursor - 1] !== " " && body[cursor - 1] !== "\n" ? " " : "";
+    const insertion = `${separator}${placeholder}`;
+    templateForm.setValue("body", `${body.slice(0, cursor)}${insertion}${body.slice(cursor)}`, { shouldValidate: true, shouldDirty: true });
+    const currentVariables = templateForm.getValues("variablesText")?.split(",").map((item) => item.trim()).filter(Boolean) ?? [];
+    templateForm.setValue("variablesText", [...new Set([...currentVariables, variable])].join(", "), { shouldDirty: true });
+    requestAnimationFrame(() => {
+      const nextCursor = cursor + insertion.length;
+      textarea?.focus();
+      textarea?.setSelectionRange(nextCursor, nextCursor);
+    });
   }
 
   function handleInvalidTemplate(): void {
@@ -329,6 +342,8 @@ export default function MessagesPage() {
     await sendBatchMessage.mutateAsync(input);
   }
 
+  const templateBodyRegistration = templateForm.register("body");
+
   return (
     <div className="space-y-5">
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
@@ -339,7 +354,7 @@ export default function MessagesPage() {
         <Card><p className="text-sm text-slate-400">Interacoes</p><strong className="mt-2 block text-3xl">{stats.interactions}</strong></Card>
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
+      <section className="grid gap-5 xl:grid-cols-[0.75fr_1.25fr]">
         <Card>
           <CardTitle>Enviar para cliente</CardTitle>
           <form className="grid gap-3" onSubmit={(event) => void sendForm.handleSubmit((input) => submitSend(input))(event)}>
@@ -388,22 +403,23 @@ export default function MessagesPage() {
         <Card>
           <CardTitle>{selectedTemplate ? "Editar mensagem criada" : "Criar mensagem"}</CardTitle>
           <form className="grid gap-3" onSubmit={(event) => void templateForm.handleSubmit((input) => saveTemplate.mutateAsync(input).then(() => undefined), handleInvalidTemplate)(event)}>
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-[minmax(0,1.6fr)_minmax(130px,0.55fr)_minmax(0,1fr)]">
               <label>
                 <Input placeholder="Nome do modelo" {...templateForm.register("name")} />
                 {templateForm.formState.errors.name ? <small className="text-red-400">{templateForm.formState.errors.name.message}</small> : null}
               </label>
               <select className={selectClass} {...templateForm.register("channel")}><option value="EMAIL">E-mail</option><option value="WHATSAPP">WhatsApp</option></select>
-              <Input placeholder="Variaveis: cliente, empresa" {...templateForm.register("variablesText")} />
+              <select className={selectClass} defaultValue="" onChange={(event) => { if (event.target.value) insertVariable(event.target.value); event.target.value = ""; }} aria-label="Adicionar variável à mensagem">
+                <option value="">Adicionar variável...</option>
+                {variableOptions.map((variable) => <option key={variable} value={variable}>{`{{${variable}}}`}</option>)}
+              </select>
             </div>
             <Input placeholder="Assunto para e-mail" {...templateForm.register("subject")} />
             <label>
-              <Textarea className="min-h-40" placeholder="Mensagem personalizada" {...templateForm.register("body")} />
+              <Textarea className="min-h-[28rem] resize-y xl:min-h-[40rem]" rows={24} placeholder="Mensagem personalizada" {...templateBodyRegistration} ref={(element: HTMLTextAreaElement | null) => { templateBodyRegistration.ref(element); templateBodyRef.current = element; }} />
               {templateForm.formState.errors.body ? <small className="text-red-400">{templateForm.formState.errors.body.message}</small> : null}
             </label>
-            <div className="flex flex-wrap gap-2">
-              {variableOptions.map((variable) => <Button key={variable} type="button" variant="outline" size="sm" onClick={() => insertVariable(variable)}><Plus size={14} /> {`{{${variable}}}`}</Button>)}
-            </div>
+            <p className="text-xs text-slate-400">Posicione o cursor na mensagem e escolha uma variável acima para inseri-la.</p>
             <div className="flex justify-between gap-3">
               <Button type="button" variant="ghost" onClick={() => { setSelectedTemplate(undefined); templateForm.reset(); }}>Limpar</Button>
               <Button type="submit" disabled={saveTemplate.isPending}><Save size={16} /> {selectedTemplate ? "Salvar edicao" : "Incluir mensagem"}</Button>

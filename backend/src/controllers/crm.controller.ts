@@ -20,7 +20,8 @@ const crmLeadFilterSchema = z.object({
   responsible: z.string().optional(),
   source: z.string().optional(),
   priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).optional(),
-  registrationStatus: z.enum(["COMPLETE", "INCOMPLETE", "UPDATING"]).optional()
+  registrationStatus: z.enum(["COMPLETE", "INCOMPLETE", "UPDATING"]).optional(),
+  relationship: z.enum(["MESSAGED", "CONTACTED", "UPDATED", "WITH_HISTORY"]).optional()
 });
 
 const crmProjectFilterSchema = z.object({

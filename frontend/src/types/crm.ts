@@ -55,6 +55,7 @@ export interface CrmLead {
   updatedAt: string;
   client?: CrmClient | null;
   activities?: CrmActivity[];
+  messages?: CommunicationMessage[];
   proposals?: CrmProposal[];
 }
 
