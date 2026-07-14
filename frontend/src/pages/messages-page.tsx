@@ -373,9 +373,9 @@ export default function MessagesPage() {
               <Search className="absolute left-3 top-3 text-slate-500" size={18} />
               <Input className="pl-10" placeholder="Buscar cliente" value={search} onChange={(event) => setSearch(event.target.value)} />
             </label>
+            {sendMode === "single" ? <select className={selectClass} {...sendForm.register("clientId")}><option value="">Selecione o cliente</option>{clientList.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select> : null}
+            <select className={selectClass} {...sendForm.register("templateId")}><option value="">Mensagem criada</option>{templates.data?.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}</select>
             <div className="grid gap-3 md:grid-cols-2">
-              {sendMode === "single" ? <select className={selectClass} {...sendForm.register("clientId")}><option value="">Selecione o cliente</option>{clientList.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select> : null}
-              <select className={selectClass} {...sendForm.register("templateId")}><option value="">Mensagem criada</option>{templates.data?.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}</select>
               <select className={selectClass} {...sendForm.register("channel")}><option value="EMAIL">E-mail</option><option value="WHATSAPP">WhatsApp</option></select>
               {sendMode === "single" ? <Input placeholder="Destinatario" {...sendForm.register("recipient")} /> : null}
             </div>
