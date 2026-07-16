@@ -1,4 +1,5 @@
 import type {
+  CrmDealStatus,
   CrmActivityType,
   CrmLeadStatus,
   CrmPipelineStage,
@@ -7,11 +8,12 @@ import type {
 } from "@prisma/client";
 import type { z } from "zod";
 import { startOfDay, startOfMonth, startOfWeek, subMonths } from "date-fns";
-import { CrmRepository, type CrmLeadFilters, type CrmProjectFilters, type CrmScope } from "../repositories/crm.repository.js";
+import { CrmRepository, type CrmDealFilters, type CrmLeadFilters, type CrmProjectFilters, type CrmScope } from "../repositories/crm.repository.js";
 import type {
   crmActivitySchema,
   crmAutomationSchema,
   crmContractSchema,
+  crmDealSchema,
   crmProjectSchema,
   crmProjectTaskSchema,
   crmProposalSchema
@@ -23,6 +25,7 @@ import { prisma } from "../prisma/client.js";
 
 type LeadInput = z.infer<typeof crmLeadSchema>;
 type ActivityInput = z.infer<typeof crmActivitySchema>;
+type DealInput = z.infer<typeof crmDealSchema>;
 type ProposalInput = z.infer<typeof crmProposalSchema>;
 type ContractInput = z.infer<typeof crmContractSchema>;
 type ProjectInput = z.infer<typeof crmProjectSchema>;
@@ -74,12 +77,29 @@ const stageProbability: Record<CrmPipelineStage, number> = {
   LOST: 0
 };
 
+function dealStatusFromStage(stage: CrmPipelineStage): CrmDealStatus {
+  if (stage === "SALE_COMPLETED" || stage === "IMPLEMENTATION") return "WON";
+  if (stage === "LOST") return "LOST";
+  return "OPEN";
+}
+
 function scope(ownerId: string): CrmScope {
   return { ownerId, tenantId: "default" };
 }
 
 function normalizeEmail(email: string | null | undefined): string | null {
   return email && email.trim().length > 0 ? email.trim() : null;
+}
+
+function normalizeDealLifecycle(input: DealInput): Pick<DealInput, "stage" | "status" | "probability"> {
+  if (input.status === "WON") return { stage: "SALE_COMPLETED", status: "WON", probability: 100 };
+  if (input.status === "LOST") return { stage: "LOST", status: "LOST", probability: 0 };
+  const status = dealStatusFromStage(input.stage);
+  return {
+    stage: input.stage,
+    status,
+    probability: status === "WON" ? 100 : status === "LOST" ? 0 : input.probability
+  };
 }
 
 function sumCurrency(values: Array<string | number | Prisma.Decimal | null | undefined>): number {
@@ -292,6 +312,126 @@ export class CrmService {
     await this.repository.softDeleteLead(id);
   }
 
+  public listDeals(ownerId: string, query: ListQuery, filters: CrmDealFilters) {
+    return this.repository.listDeals(scope(ownerId), query, filters);
+  }
+
+  public async getDeal(id: string, ownerId: string) {
+    const deal = await this.repository.findDeal(id, scope(ownerId));
+    if (!deal) throw new ApiError(404, "Negocio nao encontrado.");
+    return deal;
+  }
+
+  public async createDeal(ownerId: string, input: DealInput) {
+    const currentScope = scope(ownerId);
+    const lifecycle = normalizeDealLifecycle(input);
+    if (input.leadId) await this.getLead(input.leadId, ownerId);
+    if (input.clientId) await this.getClient(input.clientId, ownerId);
+    const deal = await this.repository.createDeal({
+      tenantId: currentScope.tenantId,
+      owner: { connect: { id: ownerId } },
+      ...(input.leadId ? { lead: { connect: { id: input.leadId } } } : {}),
+      ...(input.clientId ? { client: { connect: { id: input.clientId } } } : {}),
+      title: input.title,
+      product: input.product,
+      value: input.value,
+      probability: lifecycle.probability,
+      stage: lifecycle.stage,
+      status: lifecycle.status,
+      responsible: input.responsible,
+      expectedCloseAt: input.expectedCloseAt,
+      wonAt: lifecycle.status === "WON" ? new Date() : null,
+      lostAt: lifecycle.status === "LOST" ? new Date() : null,
+      lostReason: input.lostReason,
+      nextStep: input.nextStep,
+      observations: input.observations
+    });
+    await this.repository.createActivity({
+      tenantId: currentScope.tenantId,
+      owner: { connect: { id: ownerId } },
+      deal: { connect: { id: deal.id } },
+      ...(input.leadId ? { lead: { connect: { id: input.leadId } } } : {}),
+      ...(input.clientId ? { client: { connect: { id: input.clientId } } } : {}),
+      type: "STATUS_CHANGE",
+      status: "COMPLETED",
+      title: "Negocio criado",
+      responsible: input.responsible,
+      completedAt: new Date(),
+      metadata: { stage: lifecycle.stage, status: lifecycle.status }
+    });
+    return deal;
+  }
+
+  public async updateDeal(id: string, ownerId: string, input: DealInput) {
+    const current = await this.getDeal(id, ownerId);
+    const lifecycle = normalizeDealLifecycle(input);
+    if (input.leadId) await this.getLead(input.leadId, ownerId);
+    if (input.clientId) await this.getClient(input.clientId, ownerId);
+    const deal = await this.repository.updateDeal(id, {
+      lead: input.leadId ? { connect: { id: input.leadId } } : { disconnect: true },
+      client: input.clientId ? { connect: { id: input.clientId } } : { disconnect: true },
+      title: input.title,
+      product: input.product,
+      value: input.value,
+      probability: lifecycle.probability,
+      stage: lifecycle.stage,
+      status: lifecycle.status,
+      responsible: input.responsible,
+      expectedCloseAt: input.expectedCloseAt,
+      wonAt: lifecycle.status === "WON" ? current.wonAt ?? new Date() : null,
+      lostAt: lifecycle.status === "LOST" ? current.lostAt ?? new Date() : null,
+      lostReason: lifecycle.status === "LOST" ? input.lostReason : null,
+      nextStep: input.nextStep,
+      observations: input.observations
+    });
+    const changed = current.stage !== lifecycle.stage || current.status !== lifecycle.status;
+    await this.repository.createActivity({
+      tenantId: scope(ownerId).tenantId,
+      owner: { connect: { id: ownerId } },
+      deal: { connect: { id } },
+      ...(input.leadId ? { lead: { connect: { id: input.leadId } } } : {}),
+      ...(input.clientId ? { client: { connect: { id: input.clientId } } } : {}),
+      type: "STATUS_CHANGE",
+      status: "COMPLETED",
+      title: changed ? `Negocio atualizado para ${lifecycle.stage}` : "Negocio atualizado",
+      responsible: input.responsible,
+      completedAt: new Date(),
+      metadata: { fromStage: current.stage, toStage: lifecycle.stage, fromStatus: current.status, toStatus: lifecycle.status }
+    });
+    return deal;
+  }
+
+  public async moveDealStage(id: string, ownerId: string, stage: CrmPipelineStage) {
+    const deal = await this.getDeal(id, ownerId);
+    const status = dealStatusFromStage(stage);
+    const updated = await this.repository.updateDeal(id, {
+      stage,
+      status,
+      probability: status === "WON" ? 100 : status === "LOST" ? 0 : stageProbability[stage],
+      wonAt: status === "WON" ? deal.wonAt ?? new Date() : null,
+      lostAt: status === "LOST" ? deal.lostAt ?? new Date() : null
+    });
+    await this.repository.createActivity({
+      tenantId: scope(ownerId).tenantId,
+      owner: { connect: { id: ownerId } },
+      deal: { connect: { id } },
+      ...(deal.leadId ? { lead: { connect: { id: deal.leadId } } } : {}),
+      ...(deal.clientId ? { client: { connect: { id: deal.clientId } } } : {}),
+      type: "STATUS_CHANGE",
+      status: "COMPLETED",
+      title: `Etapa do negocio alterada para ${stage}`,
+      responsible: deal.responsible,
+      completedAt: new Date(),
+      metadata: { fromStage: deal.stage, toStage: stage }
+    });
+    return updated;
+  }
+
+  public async deleteDeal(id: string, ownerId: string) {
+    await this.getDeal(id, ownerId);
+    await this.repository.softDeleteDeal(id);
+  }
+
   public listClients(ownerId: string, query: ListQuery) {
     return this.repository.listClients(scope(ownerId), query);
   }
@@ -302,8 +442,8 @@ export class CrmService {
     return client;
   }
 
-  public listActivities(ownerId: string, leadId?: string, clientId?: string) {
-    return this.repository.listActivities(scope(ownerId), leadId, clientId);
+  public listActivities(ownerId: string, leadId?: string, clientId?: string, dealId?: string) {
+    return this.repository.listActivities(scope(ownerId), leadId, clientId, dealId);
   }
 
   public createActivity(ownerId: string, input: ActivityInput) {
@@ -313,6 +453,7 @@ export class CrmService {
       owner: { connect: { id: ownerId } },
       ...(input.leadId ? { lead: { connect: { id: input.leadId } } } : {}),
       ...(input.clientId ? { client: { connect: { id: input.clientId } } } : {}),
+      ...(input.dealId ? { deal: { connect: { id: input.dealId } } } : {}),
       ...(input.projectId ? { project: { connect: { id: input.projectId } } } : {}),
       type: input.type,
       status: input.status,
@@ -335,6 +476,7 @@ export class CrmService {
       owner: { connect: { id: ownerId } },
       ...(input.leadId ? { lead: { connect: { id: input.leadId } } } : {}),
       ...(input.clientId ? { client: { connect: { id: input.clientId } } } : {}),
+      ...(input.dealId ? { deal: { connect: { id: input.dealId } } } : {}),
       number: input.number,
       product: input.product,
       value: input.value,
@@ -348,6 +490,9 @@ export class CrmService {
     if (input.leadId) {
       await this.repository.updateLead(input.leadId, { status: "PROPOSAL_SENT", stage: "PROPOSAL_SENT" });
     }
+    if (input.dealId) {
+      await this.repository.updateDeal(input.dealId, { status: "OPEN", stage: "PROPOSAL_SENT", probability: stageProbability.PROPOSAL_SENT });
+    }
     return proposal;
   }
 
@@ -356,6 +501,7 @@ export class CrmService {
       ...input,
       lead: input.leadId ? { connect: { id: input.leadId } } : { disconnect: true },
       client: input.clientId ? { connect: { id: input.clientId } } : { disconnect: true },
+      deal: input.dealId ? { connect: { id: input.dealId } } : { disconnect: true },
       version: { increment: 1 },
       versionHistory: { push: { status: input.status, updatedAt: new Date().toISOString() } },
       approvedAt: input.status === "APPROVED" ? new Date() : null,

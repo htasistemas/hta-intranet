@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Download, FileText, Handshake, KanbanSquare, LayoutDashboard, ListFilter, Mail, Plus, Search, Settings2, UserRoundCheck } from "lucide-react";
+import { Building2, Download, FileText, Handshake, KanbanSquare, LayoutDashboard, ListFilter, Mail, Plus, Search, Settings2, UserRoundCheck, UserRoundPlus } from "lucide-react";
 import { api } from "@/services/api";
-import type { PageResult } from "@/types";
-import type { CrmActivity, CrmAutomation, CrmClient, CrmClientIntelligence, CrmDashboard, CrmLead, CrmPipelineStage, CrmProject, CrmProjectStatus, CrmProposal } from "@/types/crm";
+import type { Client, PageResult, Priority } from "@/types";
+import type { CrmActivity, CrmAutomation, CrmClient, CrmClientIntelligence, CrmDashboard, CrmLead, CrmLeadScore, CrmPipelineStage, CrmProject, CrmProjectStatus, CrmProposal } from "@/types/crm";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { currency } from "@/lib/utils";
 import { useToast } from "@/contexts/toast-context";
 import { ActivityForm, AutomationForm, AutomationList, CompactActivityList, LeadForm, ProjectForm, ProposalForm, ProposalList, type ActivityFormInput, type AutomationFormInput, type LeadFormInput, type ProjectFormInput, type ProposalFormInput } from "@/components/crm/crm-forms";
-import { CrmPipelineKanban, CrmProjectKanban } from "@/components/crm/crm-kanban";
+import { CrmPipelineKanban, CrmProjectKanban, pipelineColumns } from "@/components/crm/crm-kanban";
 import { CommunicationPanel } from "@/components/crm/communication-panel";
 
 type CrmTab = "dashboard" | "leads" | "pipeline" | "timeline" | "proposals" | "projects" | "portal" | "communication" | "automations" | "reports";
@@ -55,6 +55,8 @@ const statusLabels: Record<string, string> = {
 };
 
 const chartColors = ["#2DD4BF", "#3B82F6", "#F59E0B", "#EF4444", "#A78BFA", "#22C55E"];
+const funnelBarColors = ["#93C5FD", "#FDE68A", "#FCD34D", "#F9A8D4", "#C084FC", "#FB7185", "#67E8F9", "#A3E635", "#34D399", "#F87171"];
+type LeadSourceMode = "prospecting" | "active-clients";
 
 function tabButtonClass(active: boolean): string {
   return active ? "gradient-fill text-white" : "border border-slate-700 bg-sidebar text-slate-300 hover:bg-white/5";
@@ -70,17 +72,87 @@ function automationPayload(input: AutomationFormInput) {
   return { ...rest, parameters: parameterKey ? { [parameterKey]: parameterValue ?? null } : {} };
 }
 
+function normalizedPercent(value: number, maxValue: number): number {
+  if (!value || !maxValue) return 0;
+  return Math.max(6, Math.round((value / maxValue) * 100));
+}
+
+function pipelineTitle(stage: CrmPipelineStage): string {
+  return pipelineColumns.find((column) => column.id === stage)?.title ?? stageLabels[stage] ?? stage;
+}
+
+function priorityFromClient(value: string | null | undefined): Priority {
+  return value === "LOW" || value === "MEDIUM" || value === "HIGH" || value === "URGENT" ? value : "MEDIUM";
+}
+
+function scoreFromClient(value: string | null | undefined): CrmLeadScore {
+  return value === "VERY_HOT" || value === "HOT" || value === "WARM" || value === "COLD" ? value : "WARM";
+}
+
+function clientToLeadDraft(client: Client): CrmLead {
+  return {
+    id: "",
+    name: client.tradeName ?? client.legalName ?? client.name,
+    company: client.legalName ?? client.tradeName ?? client.name,
+    document: client.document,
+    segment: client.segment ?? null,
+    position: null,
+    email: client.email,
+    phone: client.phone ?? null,
+    whatsapp: client.whatsapp ?? null,
+    site: null,
+    postalCode: client.postalCode ?? null,
+    street: client.street ?? null,
+    number: client.number ?? null,
+    district: client.district ?? null,
+    city: client.city,
+    state: client.state,
+    source: client.source ?? "Cliente ativo",
+    campaign: null,
+    responsible: client.responsible ?? "",
+    interest: null,
+    productInterest: null,
+    estimatedValue: client.expectedValue ?? client.purchasePotential ?? null,
+    observations: client.observations ?? null,
+    score: scoreFromClient(client.temperature),
+    registrationStatus: "COMPLETE",
+    registrationStatusManual: false,
+    priority: priorityFromClient(client.priority),
+    status: "NEW",
+    stage: "LEAD_RECEIVED",
+    lostReason: null,
+    lastInteractionAt: client.lastPurchaseAt ?? null,
+    nextFollowUpAt: client.nextFollowUpAt ?? null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+}
+
 export default function CrmPage() {
   const [tab, setTab] = useState<CrmTab>("dashboard");
   const [search, setSearch] = useState("");
   const [leadDialogOpen, setLeadDialogOpen] = useState(false);
+  const [leadSourceDialogOpen, setLeadSourceDialogOpen] = useState(false);
+  const [leadSourceSearch, setLeadSourceSearch] = useState("");
+  const [leadSourceMode, setLeadSourceMode] = useState<LeadSourceMode>("prospecting");
   const [selectedLead, setSelectedLead] = useState<CrmLead | undefined>();
+  const [leadDraft, setLeadDraft] = useState<CrmLead | undefined>();
   const [selectedClientId, setSelectedClientId] = useState<string>("");
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const dashboard = useQuery({ queryKey: ["crm-dashboard"], queryFn: () => api.get<CrmDashboard>("/crm/dashboard") });
   const leadsQuery = useQuery({ queryKey: ["crm-leads", search], queryFn: () => api.get<PageResult<CrmLead>>(`/crm/leads?pageSize=100&search=${encodeURIComponent(search)}`) });
+  const prospectingLeadsQuery = useQuery({
+    queryKey: ["crm-leads", "source-prospecting", leadSourceSearch],
+    queryFn: () => api.get<PageResult<CrmLead>>(`/crm/leads?pageSize=20&search=${encodeURIComponent(leadSourceSearch)}`),
+    enabled: leadSourceDialogOpen
+  });
+  const activeClientsQuery = useQuery({
+    queryKey: ["clients", "active", "crm-lead-source", leadSourceSearch],
+    queryFn: () => api.get<PageResult<Client>>(`/clients?pageSize=20&status=ACTIVE&search=${encodeURIComponent(leadSourceSearch)}`),
+    enabled: leadSourceDialogOpen
+  });
   const clientsQuery = useQuery({ queryKey: ["crm-clients", search], queryFn: () => api.get<PageResult<CrmClient>>(`/crm/clients?pageSize=100&search=${encodeURIComponent(search)}`) });
   const activitiesQuery = useQuery({ queryKey: ["crm-activities"], queryFn: () => api.get<CrmActivity[]>("/crm/activities") });
   const proposalsQuery = useQuery({ queryKey: ["crm-proposals"], queryFn: () => api.get<CrmProposal[]>("/crm/proposals") });
@@ -88,6 +160,8 @@ export default function CrmPage() {
   const automationsQuery = useQuery({ queryKey: ["crm-automations"], queryFn: () => api.get<CrmAutomation[]>("/crm/automations") });
 
   const leads = leadsQuery.data?.data ?? [];
+  const prospectingLeads = prospectingLeadsQuery.data?.data ?? [];
+  const activeClients = activeClientsQuery.data?.data ?? [];
   const clients = clientsQuery.data?.data ?? [];
   const activities = activitiesQuery.data ?? [];
   const proposals = proposalsQuery.data ?? [];
@@ -110,9 +184,35 @@ export default function CrmPage() {
     void queryClient.invalidateQueries({ queryKey: ["crm-automations"] });
   };
 
+  const openBlankLeadForm = () => {
+    setSelectedLead(undefined);
+    setLeadDraft(undefined);
+    setLeadSourceDialogOpen(false);
+    setLeadDialogOpen(true);
+  };
+
+  const openLeadSourceDialog = (mode: LeadSourceMode = "prospecting") => {
+    setLeadSourceMode(mode);
+    setLeadSourceDialogOpen(true);
+  };
+
+  const openLeadFromProspecting = (lead: CrmLead) => {
+    setSelectedLead(lead);
+    setLeadDraft(undefined);
+    setLeadSourceDialogOpen(false);
+    setLeadDialogOpen(true);
+  };
+
+  const openLeadFromActiveClient = (client: Client) => {
+    setSelectedLead(undefined);
+    setLeadDraft(clientToLeadDraft(client));
+    setLeadSourceDialogOpen(false);
+    setLeadDialogOpen(true);
+  };
+
   const saveLead = useMutation({
     mutationFn: (input: LeadFormInput) => selectedLead ? api.put<CrmLead>(`/crm/leads/${selectedLead.id}`, input) : api.post<CrmLead>("/crm/leads", input),
-    onSuccess: () => { setLeadDialogOpen(false); setSelectedLead(undefined); refreshAll(); toast("Lead salvo com sucesso."); },
+    onSuccess: () => { setLeadDialogOpen(false); setSelectedLead(undefined); setLeadDraft(undefined); refreshAll(); toast("Lead salvo com sucesso."); },
     onError: (error) => toast(error.message, "error")
   });
 
@@ -171,15 +271,41 @@ export default function CrmPage() {
       ["Receita Prevista", currency(kpis.forecastRevenue)],
       ["Receita Realizada", currency(kpis.realizedRevenue)]
     ] as const;
+    const funnelRows = dashboard.data.funnel.map((item, index) => ({
+      ...item,
+      title: pipelineTitle(item.stage),
+      color: funnelBarColors[index % funnelBarColors.length]
+    }));
+    const maxStageTotal = Math.max(...funnelRows.map((item) => item.total), 0);
     return (
       <div className="space-y-5">
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards.map(([label, value]) => <Card key={label} className="min-h-28"><p className="text-sm text-slate-400">{label}</p><p className="mt-3 text-2xl font-semibold">{value}</p></Card>)}</section>
+        <Card className="p-5">
+          <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Analise de ganhos-perdas</p>
+              <h2 className="mt-2 text-lg font-semibold text-slate-100">Distribuicao dos leads por etapa</h2>
+            </div>
+            <p className="text-sm text-slate-400">{kpis.wonSales} venda(s) ganha(s) e {kpis.lostSales} perdida(s)</p>
+          </div>
+          <div className="space-y-5">
+            {funnelRows.map((item) => (
+              <div key={item.stage} className="grid gap-2 lg:grid-cols-[190px_1fr_56px] lg:items-center">
+                <div className="text-sm text-slate-300">{item.title}</div>
+                <div className="h-5 overflow-hidden bg-slate-800/70">
+                  <div className="h-full" style={{ width: `${normalizedPercent(item.total, maxStageTotal)}%`, backgroundColor: item.color }} />
+                </div>
+                <div className="text-right text-sm font-semibold text-slate-200">{item.total}</div>
+              </div>
+            ))}
+          </div>
+        </Card>
         <section className="grid gap-5 xl:grid-cols-2">
-          <Card><CardTitle>Funil de Conversao</CardTitle><ResponsiveContainer width="100%" height={260}><BarChart data={dashboard.data.funnel.map((item) => ({ ...item, stage: stageLabels[item.stage] }))}><CartesianGrid stroke="#263857" vertical={false} /><XAxis dataKey="stage" stroke="#94A3B8" /><YAxis stroke="#94A3B8" /><Tooltip /><Bar dataKey="total" fill="#2DD4BF" radius={[8, 8, 0, 0]} /></BarChart></ResponsiveContainer></Card>
+          <Card><CardTitle>Funil de Conversao</CardTitle><ResponsiveContainer width="100%" height={260}><BarChart data={dashboard.data.funnel.map((item) => ({ ...item, stage: pipelineTitle(item.stage) }))}><CartesianGrid stroke="#263857" vertical={false} /><XAxis dataKey="stage" stroke="#94A3B8" /><YAxis stroke="#94A3B8" /><Tooltip /><Bar dataKey="total" fill="#2DD4BF" radius={[8, 8, 0, 0]} /></BarChart></ResponsiveContainer></Card>
           <Card><CardTitle>Leads por Origem</CardTitle><ResponsiveContainer width="100%" height={260}><PieChart><Pie data={dashboard.data.leadsBySource} dataKey="total" nameKey="name" innerRadius={58} outerRadius={88}>{dashboard.data.leadsBySource.map((item, index) => <Cell key={item.name} fill={chartColors[index % chartColors.length]} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer></Card>
           <Card><CardTitle>Vendas por Vendedor</CardTitle><ResponsiveContainer width="100%" height={250}><BarChart data={dashboard.data.salesByResponsible}><XAxis dataKey="name" stroke="#94A3B8" /><YAxis stroke="#94A3B8" /><Tooltip /><Bar dataKey="total" fill="#3B82F6" radius={[8, 8, 0, 0]} /></BarChart></ResponsiveContainer></Card>
           <Card><CardTitle>Evolucao Mensal de Vendas</CardTitle><ResponsiveContainer width="100%" height={250}><LineChart data={dashboard.data.monthlySales}><CartesianGrid stroke="#263857" vertical={false} /><XAxis dataKey="month" stroke="#94A3B8" /><YAxis stroke="#94A3B8" /><Tooltip /><Line type="monotone" dataKey="total" stroke="#F59E0B" strokeWidth={3} /></LineChart></ResponsiveContainer></Card>
-          <Card><CardTitle>Conversao por Etapa</CardTitle><ResponsiveContainer width="100%" height={250}><BarChart data={dashboard.data.conversionByStage.map((item) => ({ ...item, stage: stageLabels[item.stage] }))}><XAxis dataKey="stage" stroke="#94A3B8" /><YAxis stroke="#94A3B8" /><Tooltip /><Bar dataKey="rate" fill="#22C55E" radius={[8, 8, 0, 0]} /></BarChart></ResponsiveContainer></Card>
+          <Card><CardTitle>Conversao por Etapa</CardTitle><ResponsiveContainer width="100%" height={250}><BarChart data={dashboard.data.conversionByStage.map((item) => ({ ...item, stage: pipelineTitle(item.stage) }))}><XAxis dataKey="stage" stroke="#94A3B8" /><YAxis stroke="#94A3B8" /><Tooltip /><Bar dataKey="rate" fill="#22C55E" radius={[8, 8, 0, 0]} /></BarChart></ResponsiveContainer></Card>
           <Card><CardTitle>Projetos em Andamento</CardTitle><div className="space-y-3">{dashboard.data.projectsInProgress.map((project) => <div key={project.id} className="rounded-xl bg-sidebar p-3"><div className="flex justify-between text-sm"><span>{project.name}</span><span>{project.progress}%</span></div><p className="text-xs text-slate-400">{project.client}</p></div>)}</div></Card>
         </section>
       </div>
@@ -187,12 +313,103 @@ export default function CrmPage() {
   }
 
   function renderLeads() {
-    if (leadsQuery.isLoading) return <Skeleton className="h-96" />;
     return (
-      <div className="space-y-4">
-        <div className="flex flex-col gap-3 sm:flex-row"><label className="relative flex-1"><Search className="absolute left-3 top-3 text-slate-500" size={18} /><Input className="pl-10" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar lead, empresa, CNPJ ou e-mail" /></label><Button onClick={() => { setSelectedLead(undefined); setLeadDialogOpen(true); }}><Plus size={17} /> Novo lead</Button></div>
-        <section className="grid gap-4 xl:grid-cols-3">{leads.map((lead) => <Card key={lead.id} className="cursor-pointer" onClick={() => { setSelectedLead(lead); setLeadDialogOpen(true); }}><div className="flex items-start justify-between gap-3"><div><h2 className="font-semibold">{lead.name}</h2><p className="text-sm text-slate-400">{lead.company ?? lead.email ?? "Sem empresa"}</p></div><span className="rounded-full bg-accent/10 px-2 py-1 text-xs text-accent">{statusLabels[lead.status]}</span></div><p className="mt-4 text-2xl font-semibold">{currency(Number(lead.estimatedValue ?? 0))}</p><div className="mt-4 flex flex-wrap gap-2 text-xs"><span className="rounded-full bg-blue-500/15 px-2 py-1 text-blue-300">{lead.source ?? "Origem nao informada"}</span><span className="rounded-full bg-red-500/15 px-2 py-1 text-red-300">{lead.priority}</span><span className="rounded-full bg-emerald-500/15 px-2 py-1 text-emerald-300">{lead.score}</span></div></Card>)}</section>
+      <div className="space-y-5">
+        <div className="flex flex-col gap-3 xl:flex-row">
+          <label className="relative flex-1">
+            <Search className="absolute left-3 top-3 text-slate-500" size={18} />
+            <Input className="pl-10" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar lead, empresa, CNPJ ou e-mail" />
+          </label>
+          <Button onClick={() => openLeadSourceDialog()}><Plus size={17} /> Novo lead</Button>
+        </div>
+
+        {leadsQuery.isLoading ? (
+          <Skeleton className="h-96" />
+        ) : (
+          <section className="space-y-3">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Pipeline comercial</p>
+                <h2 className="text-lg font-semibold text-slate-100">Arraste contatos entre as etapas</h2>
+              </div>
+              <p className="text-sm text-slate-400">Negociacao, fechamento e acompanhamento atualizam o funil automaticamente.</p>
+            </div>
+            <CrmPipelineKanban leads={leads} onMove={(lead, stage) => moveLead.mutate({ lead, stage })} onOpenLead={(lead) => { setSelectedLead(lead); setLeadDialogOpen(true); }} />
+          </section>
+        )}
       </div>
+    );
+  }
+
+  function renderLeadSourceDialog() {
+    return (
+      <Dialog open={leadSourceDialogOpen} title="Novo lead" onClose={() => setLeadSourceDialogOpen(false)} className="max-w-5xl">
+        <div className="space-y-5">
+          <section className="grid gap-3 md:grid-cols-3">
+            <button type="button" className="rounded-xl border border-slate-700 bg-sidebar p-4 text-left transition hover:border-accent/70" onClick={openBlankLeadForm}>
+              <span className="flex items-center gap-2 text-sm font-semibold text-slate-100"><Plus size={18} className="text-accent" /> Cadastrar do zero</span>
+              <span className="mt-2 block text-sm text-slate-400">Abre o formulario vazio para cadastrar um novo contato comercial.</span>
+            </button>
+            <button type="button" className={`rounded-xl border bg-sidebar p-4 text-left transition hover:border-accent/70 ${leadSourceMode === "prospecting" ? "border-accent" : "border-slate-700"}`} onClick={() => setLeadSourceMode("prospecting")}>
+              <span className="flex items-center gap-2 text-sm font-semibold text-slate-100"><UserRoundPlus size={18} className="text-accent" /> Trazer da captacao</span>
+              <span className="mt-2 block text-sm text-slate-400">Busque uma captacao ja cadastrada e abra o lead com os dados preenchidos.</span>
+            </button>
+            <button type="button" className={`rounded-xl border bg-sidebar p-4 text-left transition hover:border-accent/70 ${leadSourceMode === "active-clients" ? "border-accent" : "border-slate-700"}`} onClick={() => setLeadSourceMode("active-clients")}>
+              <span className="flex items-center gap-2 text-sm font-semibold text-slate-100"><Building2 size={18} className="text-accent" /> Trazer cliente ativo</span>
+              <span className="mt-2 block text-sm text-slate-400">Cria um novo lead com os dados de um cliente ativo ja cadastrado.</span>
+            </button>
+          </section>
+
+          <label className="relative block">
+            <Search className="absolute left-3 top-3 text-slate-500" size={18} />
+            <Input className="pl-10" value={leadSourceSearch} onChange={(event) => setLeadSourceSearch(event.target.value)} placeholder={leadSourceMode === "prospecting" ? "Buscar captacao por nome, empresa, CNPJ ou e-mail" : "Buscar cliente ativo por nome, empresa, CNPJ ou e-mail"} />
+          </label>
+
+          {(leadSourceMode === "prospecting" ? prospectingLeadsQuery.isLoading : activeClientsQuery.isLoading) ? (
+            <Skeleton className="h-48" />
+          ) : leadSourceMode === "prospecting" ? (
+            <section className="grid max-h-[50vh] gap-3 overflow-y-auto pr-1 md:grid-cols-2">
+              {prospectingLeads.map((lead) => (
+                <button key={lead.id} type="button" className="w-full rounded-xl border border-slate-700 bg-sidebar p-4 text-left transition hover:border-accent/70" onClick={() => openLeadFromProspecting(lead)}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-slate-100">{lead.name}</p>
+                      <p className="mt-1 truncate text-xs text-slate-400">{lead.company ?? lead.email ?? "Sem empresa"}</p>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-accent/10 px-2 py-1 text-xs text-accent">{statusLabels[lead.status]}</span>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                    <span className="rounded-full bg-blue-500/15 px-2 py-1 text-blue-200">{pipelineTitle(lead.stage)}</span>
+                    <span className="rounded-full bg-emerald-500/15 px-2 py-1 text-emerald-200">{currency(Number(lead.estimatedValue ?? 0))}</span>
+                    <span className="rounded-full bg-slate-500/15 px-2 py-1 text-slate-300">{lead.source ?? "Origem nao informada"}</span>
+                  </div>
+                </button>
+              ))}
+              {!prospectingLeads.length && <p className="rounded-xl border border-slate-700 bg-sidebar p-4 text-sm text-slate-400 md:col-span-2">Nenhuma captacao encontrada.</p>}
+            </section>
+          ) : (
+            <section className="grid max-h-[50vh] gap-3 overflow-y-auto pr-1 md:grid-cols-2">
+              {activeClients.map((client) => (
+                <button key={client.id} type="button" className="w-full rounded-xl border border-slate-700 bg-sidebar p-4 text-left transition hover:border-accent/70" onClick={() => openLeadFromActiveClient(client)}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-slate-100">{client.tradeName ?? client.legalName ?? client.name}</p>
+                      <p className="mt-1 truncate text-xs text-slate-400">{client.email ?? client.whatsapp ?? client.phone ?? "Contato nao informado"}</p>
+                    </div>
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-1 text-xs text-emerald-200"><Building2 size={13} /> Ativo</span>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                    <span className="rounded-full bg-blue-500/15 px-2 py-1 text-blue-200">{client.segment ?? "Segmento nao informado"}</span>
+                    <span className="rounded-full bg-emerald-500/15 px-2 py-1 text-emerald-200">{currency(Number(client.expectedValue ?? client.purchasePotential ?? 0))}</span>
+                    <span className="rounded-full bg-slate-500/15 px-2 py-1 text-slate-300">{[client.city, client.state].filter(Boolean).join(" / ") || "Local nao informado"}</span>
+                  </div>
+                </button>
+              ))}
+              {!activeClients.length && <p className="rounded-xl border border-slate-700 bg-sidebar p-4 text-sm text-slate-400 md:col-span-2">Nenhum cliente ativo encontrado.</p>}
+            </section>
+          )}
+        </div>
+      </Dialog>
     );
   }
 
@@ -229,8 +446,9 @@ export default function CrmPage() {
       {tab === "communication" && <CommunicationPanel leads={leads} clients={clients} />}
       {tab === "automations" && <div className="space-y-4"><Card><CardTitle>Automacao configuravel</CardTitle><AutomationForm onSave={(input) => saveAutomation.mutateAsync(input).then(() => undefined)} /></Card><Card><CardTitle>Regras ativas</CardTitle><AutomationList automations={automations} /></Card></div>}
       {tab === "reports" && <Card><CardTitle>Relatorios</CardTitle><div className="grid gap-3 md:grid-cols-3"><Button variant="outline" onClick={() => void api.download("/crm/reports.csv", "crm-comercial.csv")}><Download size={16} /> Pipeline comercial CSV</Button><Button variant="outline" onClick={() => void api.download("/crm/reports.pdf", "crm-comercial.pdf")}><Download size={16} /> Receita PDF</Button><Button variant="outline" onClick={() => void api.download("/crm/reports.xls", "crm-comercial.xls")}><Download size={16} /> Produtividade Excel</Button></div><pre className="mt-4 max-h-96 overflow-auto rounded-xl bg-sidebar p-4 text-xs text-slate-300">{JSON.stringify(dashboard.data ?? {}, null, 2)}</pre></Card>}
-      <Dialog open={leadDialogOpen} title={selectedLead ? "Editar lead" : "Novo lead"} onClose={() => setLeadDialogOpen(false)}>
-        <LeadForm lead={selectedLead} onCancel={() => setLeadDialogOpen(false)} onSave={(input) => saveLead.mutateAsync(input).then(() => undefined)} />
+      {renderLeadSourceDialog()}
+      <Dialog open={leadDialogOpen} title={selectedLead ? "Editar lead" : leadDraft ? "Novo lead a partir de cliente ativo" : "Novo lead"} onClose={() => setLeadDialogOpen(false)}>
+        <LeadForm lead={selectedLead ?? leadDraft} onCancel={() => setLeadDialogOpen(false)} onSave={(input) => saveLead.mutateAsync(input).then(() => undefined)} />
       </Dialog>
     </div>
   );

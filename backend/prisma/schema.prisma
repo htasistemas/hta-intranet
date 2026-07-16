@@ -135,6 +135,12 @@ enum CrmLeadStatus {
   LOST
 }
 
+enum CrmDealStatus {
+  OPEN
+  WON
+  LOST
+}
+
 enum CrmPipelineStage {
   LEAD_RECEIVED
   FIRST_CONTACT
@@ -286,6 +292,7 @@ model User {
   crmLeads                 CrmLead[]
   crmClients               CrmClient[]
   crmActivities            CrmActivity[]
+  crmDeals                 CrmDeal[]
   crmProposals             CrmProposal[]
   crmContracts             CrmContract[]
   crmProjects              CrmProject[]
@@ -821,6 +828,7 @@ model CrmLead {
   updatedAt         DateTime               @updatedAt
   deletedAt         DateTime?
   activities        CrmActivity[]
+  deals             CrmDeal[]
   proposals         CrmProposal[]
   messages          CommunicationMessage[]
 
@@ -854,6 +862,7 @@ model CrmClient {
   deletedAt    DateTime?
   leads        CrmLead[]
   activities   CrmActivity[]
+  deals        CrmDeal[]
   proposals    CrmProposal[]
   contracts    CrmContract[]
   projects     CrmProject[]
@@ -873,6 +882,8 @@ model CrmActivity {
   lead        CrmLead?          @relation(fields: [leadId], references: [id], onDelete: Cascade)
   clientId    String?
   client      CrmClient?        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  dealId      String?
+  deal        CrmDeal?          @relation(fields: [dealId], references: [id], onDelete: Cascade)
   projectId   String?
   project     CrmProject?       @relation(fields: [projectId], references: [id], onDelete: Cascade)
   type        CrmActivityType
@@ -890,7 +901,44 @@ model CrmActivity {
   @@index([tenantId, ownerId, scheduledAt])
   @@index([leadId, createdAt])
   @@index([clientId, createdAt])
+  @@index([dealId, createdAt])
   @@map("crm_atividades")
+}
+
+model CrmDeal {
+  id              String            @id @default(cuid())
+  tenantId        String            @default("default")
+  ownerId         String
+  owner           User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  leadId          String?
+  lead            CrmLead?          @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  clientId        String?
+  client          CrmClient?        @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  title           String
+  product         String?
+  value           Decimal?          @db.Decimal(12, 2)
+  probability     Int               @default(10)
+  stage           CrmPipelineStage  @default(LEAD_RECEIVED)
+  status          CrmDealStatus     @default(OPEN)
+  responsible     String
+  expectedCloseAt DateTime?
+  wonAt           DateTime?
+  lostAt          DateTime?
+  lostReason      String?
+  nextStep        String?
+  observations    String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  deletedAt       DateTime?
+  activities      CrmActivity[]
+  proposals       CrmProposal[]
+
+  @@index([tenantId, ownerId, status])
+  @@index([tenantId, ownerId, stage])
+  @@index([tenantId, ownerId, expectedCloseAt])
+  @@index([leadId])
+  @@index([clientId])
+  @@map("crm_negocios")
 }
 
 model CrmProposal {
@@ -902,6 +950,8 @@ model CrmProposal {
   lead           CrmLead?          @relation(fields: [leadId], references: [id], onDelete: SetNull)
   clientId       String?
   client         CrmClient?        @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  dealId         String?
+  deal           CrmDeal?          @relation(fields: [dealId], references: [id], onDelete: SetNull)
   number         String
   product        String
   value          Decimal           @db.Decimal(12, 2)
@@ -920,6 +970,7 @@ model CrmProposal {
 
   @@unique([tenantId, number])
   @@index([tenantId, ownerId, status])
+  @@index([dealId])
   @@map("crm_propostas")
 }
 

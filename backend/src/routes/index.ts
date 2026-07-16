@@ -21,6 +21,7 @@ import {
   crmActivitySchema,
   crmAutomationSchema,
   crmContractSchema,
+  crmDealSchema,
   crmLeadSchema,
   crmLeadStageSchema,
   crmProjectSchema,
@@ -160,6 +161,12 @@ apiRouter.put("/crm/leads/:id/stage", validateBody(crmLeadStageSchema), asyncHan
 apiRouter.post("/crm/leads/:id/activate-client", asyncHandler(crm.activateLead));
 apiRouter.post("/crm/leads/:id/convert", asyncHandler(crm.convertLead));
 apiRouter.delete("/crm/leads/:id", asyncHandler(crm.deleteLead));
+apiRouter.get("/crm/deals", asyncHandler(crm.listDeals));
+apiRouter.get("/crm/deals/:id", asyncHandler(crm.getDeal));
+apiRouter.post("/crm/deals", validateBody(crmDealSchema), asyncHandler(crm.createDeal));
+apiRouter.put("/crm/deals/:id", validateBody(crmDealSchema), asyncHandler(crm.updateDeal));
+apiRouter.put("/crm/deals/:id/stage", validateBody(crmLeadStageSchema), asyncHandler(crm.moveDealStage));
+apiRouter.delete("/crm/deals/:id", asyncHandler(crm.deleteDeal));
 apiRouter.get("/crm/clients", asyncHandler(crm.listClients));
 apiRouter.get("/crm/clients/:id/intelligence", asyncHandler(crm.clientIntelligence));
 apiRouter.get("/crm/clients/:id", asyncHandler(crm.getClient));

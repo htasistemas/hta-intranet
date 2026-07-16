@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
-import type { CrmLeadStatus, CrmPipelineStage, CrmProjectStatus, CrmRegistrationStatus } from "@prisma/client";
+import type { CrmDealStatus, CrmLeadStatus, CrmPipelineStage, CrmProjectStatus, CrmRegistrationStatus } from "@prisma/client";
 import { CrmService } from "../services/crm.service.js";
 import { querySchema } from "../utils/pagination.js";
 import { ApiError } from "../utils/api-error.js";
@@ -27,6 +27,14 @@ const crmLeadFilterSchema = z.object({
 const crmProjectFilterSchema = z.object({
   status: z.enum(["NOT_STARTED", "PLANNING", "IN_DEVELOPMENT", "IN_TESTS", "IN_APPROVAL", "IN_DEPLOYMENT", "IN_TRAINING", "COMPLETED", "CANCELLED"]).optional(),
   responsible: z.string().optional()
+});
+
+const crmDealFilterSchema = z.object({
+  status: z.enum(["OPEN", "WON", "LOST"]).optional(),
+  stage: z.enum(["LEAD_RECEIVED", "FIRST_CONTACT", "QUALIFICATION", "DEMONSTRATION", "PROPOSAL_SENT", "NEGOTIATION", "APPROVAL", "IMPLEMENTATION", "SALE_COMPLETED", "LOST"]).optional(),
+  responsible: z.string().optional(),
+  leadId: z.string().optional(),
+  clientId: z.string().optional()
 });
 
 function escapeCsv(value: string | number): string {
@@ -111,6 +119,38 @@ export class CrmController {
     response.status(204).send();
   };
 
+  public listDeals = async (request: Request, response: Response): Promise<void> => {
+    const query = querySchema.parse(request.query);
+    const filters = crmDealFilterSchema.parse(request.query);
+    const result = await this.service.listDeals(userId(request), query, {
+      ...filters,
+      status: filters.status as CrmDealStatus | undefined,
+      stage: filters.stage as CrmPipelineStage | undefined
+    });
+    response.json({ ...result, page: query.page, pageSize: query.pageSize });
+  };
+
+  public getDeal = async (request: Request, response: Response): Promise<void> => {
+    response.json(await this.service.getDeal(resourceId(request), userId(request)));
+  };
+
+  public createDeal = async (request: Request, response: Response): Promise<void> => {
+    response.status(201).json(await this.service.createDeal(userId(request), request.body));
+  };
+
+  public updateDeal = async (request: Request, response: Response): Promise<void> => {
+    response.json(await this.service.updateDeal(resourceId(request), userId(request), request.body));
+  };
+
+  public moveDealStage = async (request: Request, response: Response): Promise<void> => {
+    response.json(await this.service.moveDealStage(resourceId(request), userId(request), request.body.stage));
+  };
+
+  public deleteDeal = async (request: Request, response: Response): Promise<void> => {
+    await this.service.deleteDeal(resourceId(request), userId(request));
+    response.status(204).send();
+  };
+
   public convertLead = async (request: Request, response: Response): Promise<void> => {
     response.json(await this.service.convertLead(resourceId(request), userId(request)));
   };
@@ -142,8 +182,8 @@ export class CrmController {
   };
 
   public listActivities = async (request: Request, response: Response): Promise<void> => {
-    const filter = z.object({ leadId: z.string().optional(), clientId: z.string().optional() }).parse(request.query);
-    response.json(await this.service.listActivities(userId(request), filter.leadId, filter.clientId));
+    const filter = z.object({ leadId: z.string().optional(), clientId: z.string().optional(), dealId: z.string().optional() }).parse(request.query);
+    response.json(await this.service.listActivities(userId(request), filter.leadId, filter.clientId, filter.dealId));
   };
 
   public createActivity = async (request: Request, response: Response): Promise<void> => {

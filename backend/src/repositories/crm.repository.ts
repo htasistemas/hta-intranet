@@ -1,10 +1,11 @@
-import type { CrmLeadStatus, CrmPipelineStage, CrmProjectStatus, CrmRegistrationStatus, Prisma } from "@prisma/client";
+import type { CrmDealStatus, CrmLeadStatus, CrmPipelineStage, CrmProjectStatus, CrmRegistrationStatus, Prisma } from "@prisma/client";
 import { prisma } from "../prisma/client.js";
 import { pagination, type ListQuery } from "../utils/pagination.js";
 
 const leadInclude = {
   client: true,
   activities: { where: { deletedAt: null }, orderBy: { createdAt: "desc" }, take: 8 },
+  deals: { where: { deletedAt: null }, orderBy: { createdAt: "desc" } },
   messages: { where: { deletedAt: null }, orderBy: { createdAt: "desc" }, take: 1 },
   proposals: { where: { deletedAt: null }, orderBy: { createdAt: "desc" } }
 } satisfies Prisma.CrmLeadInclude;
@@ -12,6 +13,7 @@ const leadInclude = {
 const clientInclude = {
   leads: { where: { deletedAt: null }, orderBy: { createdAt: "desc" } },
   activities: { where: { deletedAt: null }, orderBy: { createdAt: "desc" } },
+  deals: { where: { deletedAt: null }, orderBy: { createdAt: "desc" } },
   proposals: { where: { deletedAt: null }, orderBy: { createdAt: "desc" } },
   contracts: { where: { deletedAt: null }, orderBy: { createdAt: "desc" } },
   projects: { where: { deletedAt: null }, include: { tasks: { where: { deletedAt: null } } }, orderBy: { createdAt: "desc" } },
@@ -23,6 +25,13 @@ const projectInclude = {
   client: true,
   tasks: { where: { deletedAt: null }, include: { subtasks: { where: { deletedAt: null } } }, orderBy: { createdAt: "desc" } }
 } satisfies Prisma.CrmProjectInclude;
+
+const dealInclude = {
+  lead: true,
+  client: true,
+  activities: { where: { deletedAt: null }, orderBy: { createdAt: "desc" }, take: 5 },
+  proposals: { where: { deletedAt: null }, orderBy: { createdAt: "desc" } }
+} satisfies Prisma.CrmDealInclude;
 
 export interface CrmScope {
   ownerId: string;
@@ -37,6 +46,14 @@ export interface CrmLeadFilters {
   priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
   registrationStatus?: CrmRegistrationStatus;
   relationship?: "MESSAGED" | "CONTACTED" | "UPDATED" | "WITH_HISTORY";
+}
+
+export interface CrmDealFilters {
+  status?: CrmDealStatus;
+  stage?: CrmPipelineStage;
+  responsible?: string;
+  leadId?: string;
+  clientId?: string;
 }
 
 export interface CrmProjectFilters {
@@ -103,6 +120,48 @@ export class CrmRepository {
     return prisma.crmLead.update({ where: { id }, data: { deletedAt: new Date() } });
   }
 
+  public async listDeals(scope: CrmScope, query: ListQuery, filters: CrmDealFilters): Promise<{ data: unknown[]; total: number }> {
+    const where: Prisma.CrmDealWhereInput = {
+      ...scope,
+      deletedAt: null,
+      ...(filters.status ? { status: filters.status } : {}),
+      ...(filters.stage ? { stage: filters.stage } : {}),
+      ...(filters.leadId ? { leadId: filters.leadId } : {}),
+      ...(filters.clientId ? { clientId: filters.clientId } : {}),
+      ...(filters.responsible ? { responsible: { contains: filters.responsible, mode: "insensitive" } } : {}),
+      ...(query.search ? {
+        OR: [
+          { title: { contains: query.search, mode: "insensitive" } },
+          { product: { contains: query.search, mode: "insensitive" } },
+          { lead: { name: { contains: query.search, mode: "insensitive" } } },
+          { client: { name: { contains: query.search, mode: "insensitive" } } }
+        ]
+      } : {})
+    };
+    const orderBy: Prisma.CrmDealOrderByWithRelationInput = query.sortBy === "expectedCloseAt" ? { expectedCloseAt: query.order } : { createdAt: query.order };
+    const [data, total] = await prisma.$transaction([
+      prisma.crmDeal.findMany({ where, ...pagination(query), orderBy, include: dealInclude }),
+      prisma.crmDeal.count({ where })
+    ]);
+    return { data, total };
+  }
+
+  public findDeal(id: string, scope: CrmScope) {
+    return prisma.crmDeal.findFirst({ where: { id, ...scope, deletedAt: null }, include: dealInclude });
+  }
+
+  public createDeal(data: Prisma.CrmDealCreateInput) {
+    return prisma.crmDeal.create({ data, include: dealInclude });
+  }
+
+  public updateDeal(id: string, data: Prisma.CrmDealUpdateInput) {
+    return prisma.crmDeal.update({ where: { id }, data, include: dealInclude });
+  }
+
+  public softDeleteDeal(id: string) {
+    return prisma.crmDeal.update({ where: { id }, data: { deletedAt: new Date() } });
+  }
+
   public listClients(scope: CrmScope, query: ListQuery): Promise<{ data: unknown[]; total: number }> {
     const where: Prisma.CrmClientWhereInput = {
       ...scope,
@@ -126,28 +185,28 @@ export class CrmRepository {
     return prisma.crmClient.findFirst({ where: { id, ...scope, deletedAt: null }, include: clientInclude });
   }
 
-  public listActivities(scope: CrmScope, leadId?: string, clientId?: string) {
+  public listActivities(scope: CrmScope, leadId?: string, clientId?: string, dealId?: string) {
     return prisma.crmActivity.findMany({
-      where: { ...scope, deletedAt: null, ...(leadId ? { leadId } : {}), ...(clientId ? { clientId } : {}) },
+      where: { ...scope, deletedAt: null, ...(leadId ? { leadId } : {}), ...(clientId ? { clientId } : {}), ...(dealId ? { dealId } : {}) },
       orderBy: [{ scheduledAt: "desc" }, { createdAt: "desc" }],
-      include: { lead: true, client: true, project: true }
+      include: { lead: true, client: true, deal: true, project: true }
     });
   }
 
   public createActivity(data: Prisma.CrmActivityCreateInput) {
-    return prisma.crmActivity.create({ data, include: { lead: true, client: true, project: true } });
+    return prisma.crmActivity.create({ data, include: { lead: true, client: true, deal: true, project: true } });
   }
 
   public listProposals(scope: CrmScope) {
-    return prisma.crmProposal.findMany({ where: { ...scope, deletedAt: null }, orderBy: { createdAt: "desc" }, include: { lead: true, client: true } });
+    return prisma.crmProposal.findMany({ where: { ...scope, deletedAt: null }, orderBy: { createdAt: "desc" }, include: { lead: true, client: true, deal: true } });
   }
 
   public createProposal(data: Prisma.CrmProposalCreateInput) {
-    return prisma.crmProposal.create({ data, include: { lead: true, client: true } });
+    return prisma.crmProposal.create({ data, include: { lead: true, client: true, deal: true } });
   }
 
   public updateProposal(id: string, data: Prisma.CrmProposalUpdateInput) {
-    return prisma.crmProposal.update({ where: { id }, data, include: { lead: true, client: true } });
+    return prisma.crmProposal.update({ where: { id }, data, include: { lead: true, client: true, deal: true } });
   }
 
   public listContracts(scope: CrmScope) {

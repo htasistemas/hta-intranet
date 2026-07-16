@@ -331,6 +331,7 @@ export const crmLeadStageSchema = z.object({
 export const crmActivitySchema = z.object({
   leadId: optionalText,
   clientId: optionalText,
+  dealId: optionalText,
   projectId: optionalText,
   type: z.enum(["CALL", "EMAIL", "WHATSAPP", "MEETING", "STATUS_CHANGE", "PROPOSAL", "CONTRACT", "TASK", "NOTE", "VISIT", "DEMONSTRATION", "FOLLOW_UP", "IMPLEMENTATION", "TRAINING"]),
   status: z.enum(["PENDING", "COMPLETED", "CANCELLED"]).default("PENDING"),
@@ -344,6 +345,7 @@ export const crmActivitySchema = z.object({
 export const crmProposalSchema = z.object({
   leadId: optionalText,
   clientId: optionalText,
+  dealId: optionalText,
   number: z.string().trim().min(2),
   product: z.string().trim().min(2),
   value: z.coerce.number().nonnegative(),
@@ -352,6 +354,37 @@ export const crmProposalSchema = z.object({
   deadline: optionalText,
   observations: optionalText,
   status: z.enum(["DRAFT", "SENT", "APPROVED", "REJECTED"]).default("DRAFT")
+});
+
+export const crmDealSchema = z.object({
+  leadId: optionalText,
+  clientId: optionalText,
+  title: z.string().trim().min(2),
+  product: optionalText,
+  value: z.coerce.number().nonnegative().optional().nullable(),
+  probability: z.coerce.number().int().min(0).max(100).default(10),
+  stage: z.enum(["LEAD_RECEIVED", "FIRST_CONTACT", "QUALIFICATION", "DEMONSTRATION", "PROPOSAL_SENT", "NEGOTIATION", "APPROVAL", "IMPLEMENTATION", "SALE_COMPLETED", "LOST"]).default("LEAD_RECEIVED"),
+  status: z.enum(["OPEN", "WON", "LOST"]).default("OPEN"),
+  responsible: z.string().trim().min(2),
+  expectedCloseAt: z.coerce.date().optional().nullable(),
+  lostReason: optionalText,
+  nextStep: optionalText,
+  observations: optionalText
+}).superRefine((fields, context) => {
+  if (!fields.leadId && !fields.clientId) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Informe um lead ou cliente vinculado ao negocio.",
+      path: ["leadId"]
+    });
+  }
+  if (fields.status === "LOST" && !fields.lostReason?.trim()) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Informe o motivo de perda.",
+      path: ["lostReason"]
+    });
+  }
 });
 
 export const crmContractSchema = z.object({

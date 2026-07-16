@@ -3,6 +3,7 @@ import type { Priority } from "@/types";
 export type CrmLeadScore = "VERY_HOT" | "HOT" | "WARM" | "COLD";
 export type CrmRegistrationStatus = "COMPLETE" | "INCOMPLETE" | "UPDATING";
 export type CrmLeadStatus = "NEW" | "IN_SERVICE" | "QUALIFIED" | "PROPOSAL_SENT" | "NEGOTIATION" | "WON" | "LOST";
+export type CrmDealStatus = "OPEN" | "WON" | "LOST";
 export type CrmPipelineStage = "LEAD_RECEIVED" | "FIRST_CONTACT" | "QUALIFICATION" | "DEMONSTRATION" | "PROPOSAL_SENT" | "NEGOTIATION" | "APPROVAL" | "IMPLEMENTATION" | "SALE_COMPLETED" | "LOST";
 export type CrmActivityType = "CALL" | "EMAIL" | "WHATSAPP" | "MEETING" | "STATUS_CHANGE" | "PROPOSAL" | "CONTRACT" | "TASK" | "NOTE" | "VISIT" | "DEMONSTRATION" | "FOLLOW_UP" | "IMPLEMENTATION" | "TRAINING";
 export type CrmActivityStatus = "PENDING" | "COMPLETED" | "CANCELLED";
@@ -54,6 +55,7 @@ export interface CrmLead {
   createdAt: string;
   updatedAt: string;
   client?: CrmClient | null;
+  deals?: CrmDeal[];
   activities?: CrmActivity[];
   messages?: CommunicationMessage[];
   proposals?: CrmProposal[];
@@ -72,6 +74,7 @@ export interface CrmClient {
   state: string | null;
   observations: string | null;
   leads?: CrmLead[];
+  deals?: CrmDeal[];
   activities?: CrmActivity[];
   proposals?: CrmProposal[];
   contracts?: CrmContract[];
@@ -92,7 +95,31 @@ export interface CrmActivity {
   createdAt: string;
   lead?: CrmLead | null;
   client?: CrmClient | null;
+  deal?: CrmDeal | null;
   project?: CrmProject | null;
+}
+
+export interface CrmDeal {
+  id: string;
+  title: string;
+  product: string | null;
+  value: string | number | null;
+  probability: number;
+  stage: CrmPipelineStage;
+  status: CrmDealStatus;
+  responsible: string;
+  expectedCloseAt: string | null;
+  wonAt: string | null;
+  lostAt: string | null;
+  lostReason: string | null;
+  nextStep: string | null;
+  observations: string | null;
+  createdAt: string;
+  updatedAt: string;
+  lead?: CrmLead | null;
+  client?: CrmClient | null;
+  activities?: CrmActivity[];
+  proposals?: CrmProposal[];
 }
 
 export interface CrmProposal {
@@ -109,6 +136,7 @@ export interface CrmProposal {
   createdAt: string;
   lead?: CrmLead | null;
   client?: CrmClient | null;
+  deal?: CrmDeal | null;
 }
 
 export interface CrmContract {
