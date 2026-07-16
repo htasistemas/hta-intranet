@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { HandCoins, Handshake, MessageSquarePlus, Plus, Search, Target, Trash2, UsersRound } from "lucide-react";
@@ -12,6 +12,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Dialog } from "@/components/ui/dialog";
 import { Input, Textarea } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/contexts/auth-context";
 import { useToast } from "@/contexts/toast-context";
 import { currency } from "@/lib/utils";
 
@@ -150,6 +151,18 @@ function commissionSummary(partner: Partner): string {
   return `${commissionLabels[partner.commissionModel]}: ${percent}${fixed}${bonus}`;
 }
 
+function monetaryValue(value: Project["budget"] | Partner["fixedAmount"] | Partner["closeBonus"]): number {
+  if (typeof value === "number") return value;
+  if (!value) return 0;
+  return Number(String(value).replace(/\./g, "").replace(",", ".")) || 0;
+}
+
+function projectedCommission(partner: Partner): number {
+  const percent = Number(partner.commissionPercent ?? 0);
+  const linkedBudget = partner.projectLinks?.reduce((total, link) => total + monetaryValue(link.project.budget), 0) ?? 0;
+  return (linkedBudget * percent / 100) + monetaryValue(partner.fixedAmount) + monetaryValue(partner.closeBonus);
+}
+
 function PartnerFormDialog({ open, partner, projects, onClose, onSave }: { open: boolean; partner?: Partner; projects: Project[]; onClose: () => void; onSave: (input: Record<string, unknown>) => Promise<void> }) {
   const { control, register, handleSubmit, formState: { errors, isSubmitting } } = useForm<PartnerForm>({
     resolver: zodResolver(partnerSchema),
@@ -244,14 +257,16 @@ function InteractionForm({ partner, onSave }: { partner?: Partner; onSave: (part
 }
 
 export default function PartnersPage() {
+  const { session } = useAuth();
   const [search, setSearch] = useState("");
   const [opened, setOpened] = useState(false);
   const [selected, setSelected] = useState<Partner | undefined>();
   const [partnerToDelete, setPartnerToDelete] = useState<Partner | undefined>();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const isPartnerUser = session?.user.role === "PARTNER";
   const partners = useQuery({ queryKey: ["partners", search], queryFn: () => api.get<PageResult<Partner>>(`/partners?pageSize=100&search=${encodeURIComponent(search)}`) });
-  const projects = useQuery({ queryKey: ["projects", "partners"], queryFn: () => api.get<PageResult<Project>>("/projects?pageSize=200") });
+  const projects = useQuery({ queryKey: ["projects", "partners"], queryFn: () => api.get<PageResult<Project>>("/projects?pageSize=200"), enabled: !isPartnerUser });
   const partnerList = partners.data?.data ?? [];
   const projectList = projects.data?.data ?? [];
 
@@ -259,8 +274,15 @@ export default function PartnersPage() {
     total: partnerList.length,
     active: partnerList.filter((partner) => partner.status === "ACTIVE").length,
     projects: partnerList.reduce((total, partner) => total + (partner._count?.projectLinks ?? partner.projectLinks?.length ?? 0), 0),
-    recurring: partnerList.filter((partner) => partner.commissionModel === "RECURRING" || partner.commissionModel === "REVENUE_SHARE").length
+    recurring: partnerList.filter((partner) => partner.commissionModel === "RECURRING" || partner.commissionModel === "REVENUE_SHARE").length,
+    clients: new Set(partnerList.flatMap((partner) => partner.projectLinks?.map((link) => link.project.client?.id ?? link.project.client?.name).filter(Boolean) ?? [])).size,
+    commission: partnerList.reduce((total, partner) => total + projectedCommission(partner), 0)
   }), [partnerList]);
+
+  useEffect(() => {
+    if (!isPartnerUser || selected || partnerList.length === 0) return;
+    setSelected(partnerList[0]);
+  }, [isPartnerUser, partnerList, selected]);
 
   const invalidate = (): void => {
     void queryClient.invalidateQueries({ queryKey: ["partners"] });
@@ -299,19 +321,25 @@ export default function PartnersPage() {
   return (
     <div className="space-y-5">
       <section className="grid gap-4 md:grid-cols-4">
-        <Card><p className="text-sm text-slate-400">Parceiros</p><strong className="mt-2 block text-3xl">{stats.total}</strong></Card>
-        <Card><p className="text-sm text-slate-400">Ativos</p><strong className="mt-2 block text-3xl">{stats.active}</strong></Card>
-        <Card><p className="text-sm text-slate-400">Projetos vinculados</p><strong className="mt-2 block text-3xl">{stats.projects}</strong></Card>
-        <Card><p className="text-sm text-slate-400">Receita recorrente</p><strong className="mt-2 block text-3xl">{stats.recurring}</strong></Card>
+        <Card><p className="text-sm text-slate-400">{isPartnerUser ? "Minha parceria" : "Parceiros"}</p><strong className="mt-2 block text-3xl">{stats.total}</strong></Card>
+        <Card><p className="text-sm text-slate-400">Clientes vinculados</p><strong className="mt-2 block text-3xl">{stats.clients}</strong></Card>
+        <Card><p className="text-sm text-slate-400">Vendas/projetos</p><strong className="mt-2 block text-3xl">{stats.projects}</strong></Card>
+        <Card><p className="text-sm text-slate-400">Comissao projetada</p><strong className="mt-2 block text-3xl">{currency(stats.commission)}</strong></Card>
       </section>
 
       <Card>
+        {isPartnerUser ? (
+          <div className="mb-4 rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-4 text-sm text-emerald-100">
+            <p className="font-semibold">Carteira do parceiro</p>
+            <p className="mt-1 text-emerald-100/80">Aqui ficam somente os clientes, vendas/projetos, interacoes e regras de comissao vinculados ao seu parceiro. Cadastros e regras comerciais sao mantidos pela administracao.</p>
+          </div>
+        ) : null}
         <div className="flex flex-col gap-3 lg:flex-row">
           <label className="relative flex-1">
             <Search className="absolute left-3 top-3 text-slate-500" size={18} />
             <Input className="pl-10" placeholder="Buscar parceiro, empresa, contato ou segmento" value={search} onChange={(event) => setSearch(event.target.value)} />
           </label>
-          <Button onClick={() => { setSelected(undefined); setOpened(true); }}><Plus size={17} /> Novo parceiro</Button>
+          {!isPartnerUser ? <Button onClick={() => { setSelected(undefined); setOpened(true); }}><Plus size={17} /> Novo parceiro</Button> : null}
         </div>
       </Card>
 
@@ -328,29 +356,64 @@ export default function PartnersPage() {
                   </div>
                   <p className="mt-1 text-sm text-slate-400">{partner.company ?? partner.contactName ?? "Sem empresa informada"} - {partner.segment ?? "Segmento nao informado"}</p>
                   <p className="mt-3 text-sm text-slate-300"><HandCoins className="mr-2 inline" size={16} />{commissionSummary(partner)}</p>
+                  {partner.users && partner.users.length > 0 ? (
+                    <p className="mt-2 text-xs text-slate-400"><UsersRound className="mr-1 inline" size={14} />Usuarios vinculados: {partner.users.map((user) => user.name).join(", ")}</p>
+                  ) : null}
                   <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-300">
                     {(partner.projectLinks ?? []).slice(0, 4).map((link) => <span key={link.project.id} className="rounded-md border border-slate-700 px-2 py-1">{link.project.code} - {link.project.name}</span>)}
                     {(partner._count?.projectLinks ?? 0) > 4 ? <span className="rounded-md border border-slate-700 px-2 py-1">+{(partner._count?.projectLinks ?? 0) - 4}</span> : null}
                   </div>
                 </div>
-                <div className="flex shrink-0 gap-2" onClick={(event) => event.stopPropagation()}>
-                  <Button variant="outline" onClick={() => { setSelected(partner); setOpened(true); }}>Editar</Button>
-                  <Button variant="danger" size="icon" onClick={() => setPartnerToDelete(partner)}><Trash2 size={17} /></Button>
-                </div>
+                {!isPartnerUser ? (
+                  <div className="flex shrink-0 gap-2" onClick={(event) => event.stopPropagation()}>
+                    <Button variant="outline" onClick={() => { setSelected(partner); setOpened(true); }}>Editar</Button>
+                    <Button variant="danger" size="icon" onClick={() => setPartnerToDelete(partner)}><Trash2 size={17} /></Button>
+                  </div>
+                ) : null}
               </div>
             </Card>
           ))}
+          {!partners.isLoading && partnerList.length === 0 ? <Card className="text-center text-sm text-slate-400">Nenhum parceiro encontrado para esta carteira.</Card> : null}
         </div>
 
         <aside className="space-y-4">
           <Card>
-            <CardTitle>Playbook de parceria</CardTitle>
+            <CardTitle>{isPartnerUser ? "Resumo comercial" : "Playbook de parceria"}</CardTitle>
             <div className="space-y-3 text-sm text-slate-300">
-              <p><Handshake className="mr-2 inline text-accent" size={16} />Indicacao: 5-15% na primeira venda quando o parceiro so abre a porta.</p>
-              <p><UsersRound className="mr-2 inline text-sky-300" size={16} />Revenda: 15-30% com meta, pipeline ativo e responsabilidade comercial.</p>
-              <p><Target className="mr-2 inline text-emerald-300" size={16} />Implantacao: valor fixo por projeto ou hibrido quando o parceiro entrega onboarding/sucesso.</p>
+              {isPartnerUser ? (
+                <>
+                  <p><Handshake className="mr-2 inline text-accent" size={16} />Acompanhe a regra de comissao do parceiro selecionado e os projetos que compoem sua carteira.</p>
+                  <p><UsersRound className="mr-2 inline text-sky-300" size={16} />Clientes vinculados aparecem dentro dos projetos/vendas associados ao parceiro.</p>
+                  <p><Target className="mr-2 inline text-emerald-300" size={16} />Registre interacoes para manter historico de reunioes, proximos passos e combinados.</p>
+                </>
+              ) : (
+                <>
+                  <p><Handshake className="mr-2 inline text-accent" size={16} />Indicacao: 5-15% na primeira venda quando o parceiro so abre a porta.</p>
+                  <p><UsersRound className="mr-2 inline text-sky-300" size={16} />Revenda: 15-30% com meta, pipeline ativo e responsabilidade comercial.</p>
+                  <p><Target className="mr-2 inline text-emerald-300" size={16} />Implantacao: valor fixo por projeto ou hibrido quando o parceiro entrega onboarding/sucesso.</p>
+                </>
+              )}
             </div>
           </Card>
+          {selected ? (
+            <Card>
+              <CardTitle>Clientes e vendas</CardTitle>
+              <div className="mt-3 max-h-80 space-y-2 overflow-y-auto">
+                {selected.projectLinks?.map((link) => (
+                  <article key={link.project.id} className="rounded-xl border border-slate-700 bg-sidebar p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-medium">{link.project.code} - {link.project.name}</p>
+                        <p className="mt-1 text-xs text-slate-400">{link.project.client?.name ?? "Cliente nao informado"} {link.project.product ? `- ${link.project.product.name}` : ""}</p>
+                      </div>
+                      <span className="text-xs text-accent">{currency(monetaryValue(link.project.budget))}</span>
+                    </div>
+                  </article>
+                ))}
+                {(!selected.projectLinks || selected.projectLinks.length === 0) ? <p className="text-sm text-slate-400">Nenhum projeto/venda vinculado ainda.</p> : null}
+              </div>
+            </Card>
+          ) : null}
           <Card>
             <CardTitle>{selected ? `Interacoes - ${selected.name}` : "Interacoes"}</CardTitle>
             <InteractionForm partner={selected} onSave={(partnerId, input) => createInteraction.mutateAsync({ partnerId, input }).then(() => undefined)} />

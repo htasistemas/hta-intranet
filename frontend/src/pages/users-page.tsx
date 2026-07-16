@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, Edit3, KeyRound, Plus, Search, ShieldCheck, Trash2, UserPlus, UsersRound } from "lucide-react";
+import { Bell, Handshake, Edit3, KeyRound, Plus, Search, ShieldCheck, Trash2, UserPlus, UsersRound } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { api } from "@/services/api";
-import type { UserAccount, UserRole } from "@/types";
+import type { PageResult, Partner, UserAccount, UserRole } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -20,16 +20,21 @@ const selectClass = "h-11 w-full rounded-xl border border-slate-700 bg-sidebar p
 const roleLabels: Record<UserRole, string> = {
   ADMIN: "Administrador",
   MANAGER: "Gestor",
-  USER: "Usuario"
+  USER: "Usuario",
+  PARTNER: "Parceiro"
 };
 
 const userFormSchema = z.object({
   name: z.string().trim().min(2, "Informe o nome."),
   email: z.string().trim().email("Informe um e-mail valido."),
   password: z.string(),
-  role: z.enum(["ADMIN", "MANAGER", "USER"]),
+  role: z.enum(["ADMIN", "MANAGER", "USER", "PARTNER"]),
+  partnerId: z.string().optional().nullable(),
   theme: z.enum(["dark", "light"]),
   notifications: z.boolean()
+}).refine((data) => data.role !== "PARTNER" || Boolean(data.partnerId), {
+  message: "Selecione o parceiro vinculado.",
+  path: ["partnerId"]
 });
 
 type UserFormFields = z.infer<typeof userFormSchema>;
@@ -38,6 +43,7 @@ interface UserPayload {
   name: string;
   email: string;
   role: UserRole;
+  partnerId?: string | null;
   theme: "dark" | "light";
   notifications: boolean;
   password?: string;
@@ -53,6 +59,7 @@ const emptyUserForm: UserFormFields = {
   email: "",
   password: "",
   role: "USER",
+  partnerId: "",
   theme: "dark",
   notifications: true
 };
@@ -68,18 +75,20 @@ function formValues(user?: UserAccount): UserFormFields {
     email: user.email,
     password: "",
     role: user.role,
+    partnerId: user.partnerId ?? "",
     theme: user.theme,
     notifications: user.notifications
   };
 }
 
-function UserForm({ user, onCancel, onSave }: { user?: UserAccount; onCancel: () => void; onSave: (input: UserPayload) => Promise<void> }) {
+function UserForm({ user, partners, onCancel, onSave }: { user?: UserAccount; partners: Partner[]; onCancel: () => void; onSave: (input: UserPayload) => Promise<void> }) {
   const { toast } = useToast();
   const values = useMemo(() => formValues(user), [user]);
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<UserFormFields>({
+  const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<UserFormFields>({
     resolver: zodResolver(userFormSchema),
     values
   });
+  const selectedRole = watch("role");
 
   const submit = async (fields: UserFormFields) => {
     const password = fields.password.trim();
@@ -95,6 +104,7 @@ function UserForm({ user, onCancel, onSave }: { user?: UserAccount; onCancel: ()
       name: fields.name.trim(),
       email: fields.email.trim().toLowerCase(),
       role: fields.role,
+      partnerId: fields.role === "PARTNER" ? fields.partnerId ?? null : null,
       theme: fields.theme,
       notifications: fields.notifications
     };
@@ -122,10 +132,22 @@ function UserForm({ user, onCancel, onSave }: { user?: UserAccount; onCancel: ()
         Permissao
         <select className={`mt-2 ${selectClass}`} {...register("role")}>
           <option value="USER">Usuario</option>
+          <option value="PARTNER">Parceiro</option>
           <option value="MANAGER">Gestor</option>
           <option value="ADMIN">Administrador</option>
         </select>
+        {errors.role && <small className="text-red-400">{errors.role.message}</small>}
       </label>
+      {selectedRole === "PARTNER" && (
+        <label>
+          Parceiro vinculado
+          <select className={`mt-2 ${selectClass}`} {...register("partnerId")}>
+            <option value="">Selecione o parceiro</option>
+            {partners.map((partner) => <option key={partner.id} value={partner.id}>{partner.name} {partner.company ? `- ${partner.company}` : ""}</option>)}
+          </select>
+          {errors.partnerId && <small className="text-red-400">{errors.partnerId.message}</small>}
+        </label>
+      )}
       <label>
         Tema
         <select className={`mt-2 ${selectClass}`} {...register("theme")}>
@@ -138,6 +160,12 @@ function UserForm({ user, onCancel, onSave }: { user?: UserAccount; onCancel: ()
         <Bell size={17} className="text-accent" />
         Receber notificacoes do sistema
       </label>
+      {selectedRole === "PARTNER" && (
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-100 md:col-span-2">
+          <p className="font-semibold">Acesso de parceiro</p>
+          <p className="mt-1 text-emerald-100/80">Este usuario acessa a gestao do parceiro vinculado, acompanhando clientes/projetos relacionados, vendas realizadas por ele e regras de comissao.</p>
+        </div>
+      )}
       <div className="flex justify-end gap-3 md:col-span-2">
         <Button type="button" variant="ghost" onClick={onCancel}>Cancelar</Button>
         <Button disabled={isSubmitting}>{isSubmitting ? "Salvando..." : "Salvar usuario"}</Button>
@@ -159,18 +187,25 @@ export default function UsersPage() {
     queryFn: () => api.get<UserAccount[]>("/users"),
     enabled: session?.user.role === "ADMIN"
   });
+  const partnersQuery = useQuery({
+    queryKey: ["partners", "user-form"],
+    queryFn: () => api.get<PageResult<Partner>>("/partners?pageSize=200"),
+    enabled: session?.user.role === "ADMIN"
+  });
 
   const users = usersQuery.data ?? [];
+  const partners = partnersQuery.data?.data ?? [];
   const filteredUsers = useMemo(() => {
     const term = search.trim().toLowerCase();
     if (!term) return users;
-    return users.filter((user) => [user.name, user.email, roleLabels[user.role]].some((field) => field.toLowerCase().includes(term)));
+    return users.filter((user) => [user.name, user.email, roleLabels[user.role], user.partner?.name ?? ""].some((field) => field.toLowerCase().includes(term)));
   }, [search, users]);
 
   const metrics = useMemo(() => ({
     total: users.length,
     admins: users.filter((user) => user.role === "ADMIN").length,
     managers: users.filter((user) => user.role === "MANAGER").length,
+    partners: users.filter((user) => user.role === "PARTNER").length,
     notifications: users.filter((user) => user.notifications).length
   }), [users]);
 
@@ -211,7 +246,7 @@ export default function UsersPage() {
         <Card><p className="text-sm text-slate-400">Usuarios cadastrados</p><p className="mt-3 text-3xl font-semibold">{metrics.total}</p></Card>
         <Card><p className="text-sm text-slate-400">Administradores</p><p className="mt-3 text-3xl font-semibold">{metrics.admins}</p></Card>
         <Card><p className="text-sm text-slate-400">Gestores</p><p className="mt-3 text-3xl font-semibold">{metrics.managers}</p></Card>
-        <Card><p className="text-sm text-slate-400">Com notificacoes</p><p className="mt-3 text-3xl font-semibold">{metrics.notifications}</p></Card>
+        <Card><p className="text-sm text-slate-400">Usuarios parceiros</p><p className="mt-3 text-3xl font-semibold">{metrics.partners}</p></Card>
       </section>
 
       <div className="flex flex-col gap-3 lg:flex-row">
@@ -228,7 +263,7 @@ export default function UsersPage() {
         {usersQuery.isLoading ? <Skeleton className="m-5 h-72" /> : (
           <table className="w-full min-w-[820px] text-left text-sm">
             <thead className="border-b border-slate-700 text-xs uppercase text-slate-400">
-              <tr><th className="p-5">Usuario</th><th>Permissao</th><th>Tema</th><th>Notificacoes</th><th>Criado em</th><th /></tr>
+              <tr><th className="p-5">Usuario</th><th>Permissao</th><th>Parceiro</th><th>Notificacoes</th><th>Criado em</th><th /></tr>
             </thead>
             <tbody>
               {filteredUsers.map((user) => {
@@ -242,7 +277,7 @@ export default function UsersPage() {
                       </div>
                     </td>
                     <td><span className="rounded-full bg-blue-500/15 px-3 py-1 text-xs text-blue-300">{roleLabels[user.role]}</span></td>
-                    <td>{user.theme === "dark" ? "Escuro" : "Claro"}</td>
+                    <td>{user.partner ? <span className="inline-flex items-center gap-2 text-slate-200"><Handshake size={15} className="text-accent" /> {user.partner.name}</span> : "-"}</td>
                     <td>{user.notifications ? "Ativas" : "Inativas"}</td>
                     <td>{formatDate(user.createdAt)}</td>
                     <td>
@@ -267,6 +302,7 @@ export default function UsersPage() {
         </div>
         <UserForm
           user={selectedUser}
+          partners={partners}
           onCancel={() => setDialogOpen(false)}
           onSave={(data) => saveUser.mutateAsync({ id: selectedUser?.id, data }).then(() => undefined)}
         />

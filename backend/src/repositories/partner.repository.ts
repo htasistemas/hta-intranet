@@ -6,22 +6,25 @@ import { pagination } from "../utils/pagination.js";
 const partnerInclude = {
   projectLinks: { include: { project: { include: { client: true, product: true } } } },
   interactions: { orderBy: { occurredAt: "desc" }, take: 20 },
-  _count: { select: { projectLinks: true, interactions: true } }
+  users: { select: { id: true, name: true, email: true, role: true } },
+  _count: { select: { projectLinks: true, interactions: true, users: true } }
 } satisfies Prisma.PartnerInclude;
 
 export class PartnerRepository {
   public async list(ownerId: string, query: ListQuery) {
     const where: Prisma.PartnerWhereInput = {
-      ownerId,
-      ...(query.search ? {
-        OR: [
-          { name: { contains: query.search, mode: "insensitive" } },
-          { company: { contains: query.search, mode: "insensitive" } },
-          { contactName: { contains: query.search, mode: "insensitive" } },
-          { email: { contains: query.search, mode: "insensitive" } },
-          { segment: { contains: query.search, mode: "insensitive" } }
-        ]
-      } : {})
+      AND: [
+        { OR: [{ ownerId }, { users: { some: { id: ownerId } } }] },
+        ...(query.search ? [{
+          OR: [
+            { name: { contains: query.search, mode: "insensitive" } },
+            { company: { contains: query.search, mode: "insensitive" } },
+            { contactName: { contains: query.search, mode: "insensitive" } },
+            { email: { contains: query.search, mode: "insensitive" } },
+            { segment: { contains: query.search, mode: "insensitive" } }
+          ]
+        }] : [])
+      ]
     };
     const [data, total] = await prisma.$transaction([
       prisma.partner.findMany({ where, ...pagination(query), include: partnerInclude, orderBy: { updatedAt: query.order } }),
@@ -31,7 +34,7 @@ export class PartnerRepository {
   }
 
   public findById(id: string, ownerId: string) {
-    return prisma.partner.findFirst({ where: { id, ownerId }, include: partnerInclude });
+    return prisma.partner.findFirst({ where: { id, OR: [{ ownerId }, { users: { some: { id: ownerId } } }] }, include: partnerInclude });
   }
 
   public create(data: Prisma.PartnerCreateInput) {

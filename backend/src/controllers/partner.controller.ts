@@ -13,6 +13,11 @@ function resourceId(request: Request): string {
   return z.string().parse(request.params.id);
 }
 
+function ensureCanManagePartners(request: Request): void {
+  if (!request.auth) throw new ApiError(401, "Nao autenticado.");
+  if (request.auth.role === "PARTNER") throw new ApiError(403, "Usuario parceiro pode consultar a propria carteira e registrar interacoes, mas nao alterar cadastros comerciais.");
+}
+
 export class PartnerController {
   public constructor(private readonly service = new PartnerService()) {}
 
@@ -27,14 +32,17 @@ export class PartnerController {
   };
 
   public create = async (request: Request, response: Response): Promise<void> => {
+    ensureCanManagePartners(request);
     response.status(201).json(await this.service.create(request.body, userId(request)));
   };
 
   public update = async (request: Request, response: Response): Promise<void> => {
+    ensureCanManagePartners(request);
     response.json(await this.service.update(resourceId(request), request.body, userId(request)));
   };
 
   public delete = async (request: Request, response: Response): Promise<void> => {
+    ensureCanManagePartners(request);
     await this.service.delete(resourceId(request), userId(request));
     response.status(204).send();
   };

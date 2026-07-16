@@ -15,7 +15,7 @@ interface Credentials {
 interface TokenSet {
   accessToken: string;
   refreshToken: string;
-  user: { id: string; name: string; email: string; role: string };
+  user: { id: string; name: string; email: string; role: string; partnerId: string | null };
 }
 
 interface GoogleTokenInfo {
@@ -55,29 +55,29 @@ async function sendPasswordResetEmail(input: { email: string; name: string; link
 }
 
 export class AuthService {
-  private issueAccessToken(user: { id: string; email: string; role: string }): string {
+  private issueAccessToken(user: { id: string; email: string; role: string; partnerId?: string | null }): string {
     return jwt.sign(
-      { email: user.email, role: user.role },
+      { email: user.email, role: user.role, partnerId: user.partnerId ?? null },
       env.JWT_SECRET,
       { subject: user.id, expiresIn: env.JWT_EXPIRES_IN as SignOptions["expiresIn"] }
     );
   }
 
-  private issueRefreshToken(user: { id: string; email: string; role: string }): string {
+  private issueRefreshToken(user: { id: string; email: string; role: string; partnerId?: string | null }): string {
     return jwt.sign(
-      { email: user.email, role: user.role },
+      { email: user.email, role: user.role, partnerId: user.partnerId ?? null },
       env.JWT_REFRESH_SECRET,
       { subject: user.id, jwtid: randomUUID(), expiresIn: env.JWT_REFRESH_EXPIRES_IN as SignOptions["expiresIn"] }
     );
   }
 
-  private async createSession(user: { id: string; name: string; email: string; role: string }): Promise<TokenSet> {
+  private async createSession(user: { id: string; name: string; email: string; role: string; partnerId?: string | null }): Promise<TokenSet> {
     const refreshToken = this.issueRefreshToken(user);
     await prisma.refreshToken.create({ data: { userId: user.id, tokenHash: hashToken(refreshToken), expiresAt: addDays(new Date(), 7) } });
     return {
       accessToken: this.issueAccessToken(user),
       refreshToken,
-      user: { id: user.id, name: user.name, email: user.email, role: user.role }
+      user: { id: user.id, name: user.name, email: user.email, role: user.role, partnerId: user.partnerId ?? null }
     };
   }
 
@@ -144,7 +144,7 @@ export class AuthService {
     return {
       accessToken: this.issueAccessToken(record.user),
       refreshToken: nextRefreshToken,
-      user: { id: record.user.id, name: record.user.name, email: record.user.email, role: record.user.role }
+      user: { id: record.user.id, name: record.user.name, email: record.user.email, role: record.user.role, partnerId: record.user.partnerId ?? null }
     };
   }
 

@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "react-router-dom";
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Building2, Download, FileText, Handshake, KanbanSquare, LayoutDashboard, ListFilter, Mail, Plus, Search, Settings2, UserRoundCheck, UserRoundPlus } from "lucide-react";
 import { api } from "@/services/api";
@@ -17,6 +18,7 @@ import { CrmPipelineKanban, CrmProjectKanban, pipelineColumns } from "@/componen
 import { CommunicationPanel } from "@/components/crm/communication-panel";
 
 type CrmTab = "dashboard" | "leads" | "pipeline" | "timeline" | "proposals" | "projects" | "portal" | "communication" | "automations" | "reports";
+type CrmLocationState = { crmTab?: CrmTab };
 
 const tabs: Array<{ id: CrmTab; label: string; icon: typeof LayoutDashboard }> = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -139,6 +141,7 @@ export default function CrmPage() {
   const [leadDraft, setLeadDraft] = useState<CrmLead | undefined>();
   const [selectedClientId, setSelectedClientId] = useState<string>("");
   const queryClient = useQueryClient();
+  const location = useLocation();
   const { toast } = useToast();
 
   const dashboard = useQuery({ queryKey: ["crm-dashboard"], queryFn: () => api.get<CrmDashboard>("/crm/dashboard") });
@@ -215,6 +218,11 @@ export default function CrmPage() {
     onSuccess: () => { setLeadDialogOpen(false); setSelectedLead(undefined); setLeadDraft(undefined); refreshAll(); toast("Lead salvo com sucesso."); },
     onError: (error) => toast(error.message, "error")
   });
+
+  useEffect(() => {
+    const state = location.state as CrmLocationState | null;
+    if (state?.crmTab) setTab(state.crmTab);
+  }, [location.state]);
 
   const moveLead = useMutation({
     mutationFn: ({ lead, stage }: { lead: CrmLead; stage: CrmPipelineStage }) => api.put<CrmLead>(`/crm/leads/${lead.id}/stage`, { stage }),

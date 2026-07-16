@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Edit3, Filter, History, LayoutGrid, List, Mail, Plus, Printer, Search, Trash2, TrendingUp, Upload, UserCheck, X } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Edit3, Filter, History, LayoutGrid, List, Mail, Plus, Printer, Send, Search, Trash2, TrendingUp, Upload, UserCheck, X } from "lucide-react";
 import { api } from "@/services/api";
 import type { PageResult } from "@/types";
 import type { CrmLead, CrmLeadCityStat, CrmLeadImportResult, CrmLeadScore, CrmLeadStats, CrmLeadStatus, CrmRegistrationStatus } from "@/types/crm";
@@ -88,6 +89,7 @@ export default function ProspectingPage() {
   const [leadToEmail, setLeadToEmail] = useState<CrmLead | undefined>();
   const [leadToHistory, setLeadToHistory] = useState<CrmLead | undefined>();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const { data, isLoading } = useQuery({
     queryKey: ["crm-leads", "prospecting", search, statusFilter, priorityFilter, registrationFilter, relationshipFilter],
@@ -226,6 +228,18 @@ export default function ProspectingPage() {
       refreshLists();
       void queryClient.invalidateQueries({ queryKey: ["clients"] });
       toast("Captacao movida para clientes ativos.");
+    },
+    onError: (error) => toast(error.message, "error")
+  });
+
+  const sendToLead = useMutation({
+    mutationFn: (leadId: string) => api.put<CrmLead>(`/crm/leads/${leadId}/stage`, { stage: "LEAD_RECEIVED" }),
+    onSuccess: () => {
+      refreshLists();
+      setOpened(false);
+      setSelected(undefined);
+      toast("Captacao enviada para leads.");
+      navigate("/crm-comercial", { state: { crmTab: "leads" } });
     },
     onError: (error) => toast(error.message, "error")
   });
@@ -376,6 +390,17 @@ export default function ProspectingPage() {
       )}
 
       <Dialog open={opened} title={selected ? "Editar captacao" : "Nova captacao"} onClose={() => setOpened(false)} className="max-w-[96vw] xl:max-w-7xl">
+        {selected && (
+          <div className="mb-4 flex flex-col gap-3 rounded-xl border border-slate-700 bg-sidebar p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-slate-100">Enviar para CRM Comercial</p>
+              <p className="mt-1 text-xs text-slate-400">Move esta captacao para a etapa Leads de Entrada e abre o pipeline comercial.</p>
+            </div>
+            <Button type="button" onClick={() => sendToLead.mutate(selected.id)} disabled={sendToLead.isPending}>
+              <Send size={16} /> {sendToLead.isPending ? "Enviando..." : "Enviar para lead"}
+            </Button>
+          </div>
+        )}
         <LeadForm lead={selected} onCancel={() => setOpened(false)} onSave={(input) => save.mutateAsync(input).then(() => undefined)} />
       </Dialog>
       <LeadImportDialog open={importOpened} onClose={() => setImportOpened(false)} onImported={handleImported} />

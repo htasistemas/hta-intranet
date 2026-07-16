@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   CalendarDays,
@@ -84,6 +84,14 @@ const navigation: NavigationGroup[] = [
   }
 ];
 
+const partnerNavigation: NavigationGroup[] = [
+  {
+    title: "Parceiro",
+    icon: Handshake,
+    items: [{ label: "Minha parceria", href: "/parceiros", icon: Handshake }]
+  }
+];
+
 const sidebarStorageKey = "htasistemas.sidebar.collapsed";
 const routeTitles: Record<string, string> = { "/": "Dashboard", "/calculadora": "Calculadora", "/clientes": "Clientes" };
 
@@ -98,12 +106,18 @@ export function AppLayout() {
   const [mobileOpened, setMobileOpened] = useState(false);
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(sidebarStorageKey) === "true");
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(groupsInitiallyOpen);
-  const activeGroup = navigation.find((group) => group.items.some((item) => item.href === location.pathname));
+  const visibleNavigation = useMemo(() => session?.user.role === "PARTNER" ? partnerNavigation : navigation, [session?.user.role]);
+  const activeGroup = visibleNavigation.find((group) => group.items.some((item) => item.href === location.pathname));
   const title = activeGroup?.items.find((item) => item.href === location.pathname)?.label ?? routeTitles[location.pathname] ?? "Dashboard";
 
   useEffect(() => {
     localStorage.setItem(sidebarStorageKey, String(collapsed));
   }, [collapsed]);
+
+  useEffect(() => {
+    if (session?.user.role !== "PARTNER" || location.pathname === "/parceiros") return;
+    navigate("/parceiros", { replace: true });
+  }, [location.pathname, navigate, session?.user.role]);
 
   useEffect(() => {
     if (!activeGroup) return;
@@ -156,7 +170,7 @@ export function AppLayout() {
         </div>
 
         <nav className={cn("flex-1 space-y-3 overflow-y-auto p-4", collapsed && "lg:px-3")}>
-          {navigation.map((group) => {
+          {visibleNavigation.map((group) => {
             const expanded = expandedGroups[group.title];
             const GroupIcon = group.icon;
             return (

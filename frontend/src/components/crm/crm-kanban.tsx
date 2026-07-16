@@ -45,14 +45,14 @@ function LeadCard({ lead, onOpenLead }: { lead: CrmLead; onOpenLead?: (lead: Crm
       onClick={() => onOpenLead?.(lead)}
     >
       <div className="mb-2 flex items-start justify-between gap-2">
-        <div><p className="text-sm font-medium">{lead.name}</p><p className="text-xs text-slate-400">{lead.company ?? "Sem empresa"}</p></div>
+        <div className="min-w-0"><p className="truncate text-sm font-medium">{lead.name}</p><p className="truncate text-xs text-slate-400">{lead.company ?? "Sem empresa"}</p></div>
         <button {...listeners} {...attributes} aria-label="Arrastar lead" onClick={(event) => event.stopPropagation()}><GripVertical className="text-slate-500" size={17} /></button>
       </div>
       <div className="space-y-2 text-xs text-slate-400">
-        <p className="flex items-center gap-1"><UserRound size={13} /> {lead.responsible}</p>
+        <p className="flex items-center gap-1"><UserRound className="shrink-0" size={13} /> <span className="truncate">{lead.responsible}</span></p>
         <p>{currency(Number(lead.estimatedValue ?? 0))}</p>
-        <p>Ultima interacao: {dateLabel(lead.lastInteractionAt)}</p>
-        <p>Proximo follow-up: {dateLabel(lead.nextFollowUpAt)}</p>
+        <p className="truncate">Ultima interacao: {dateLabel(lead.lastInteractionAt)}</p>
+        <p className="truncate">Proximo follow-up: {dateLabel(lead.nextFollowUpAt)}</p>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
         <span className={cn("rounded-full px-2 py-1 text-[11px]", lead.priority === "URGENT" || lead.priority === "HIGH" ? "bg-red-500/15 text-red-300" : "bg-blue-500/15 text-blue-300")}>{lead.priority}</span>
@@ -65,9 +65,12 @@ function LeadCard({ lead, onOpenLead }: { lead: CrmLead; onOpenLead?: (lead: Crm
 function PipelineColumn({ column, leads, onOpenLead }: { column: { id: CrmPipelineStage; title: string }; leads: CrmLead[]; onOpenLead?: (lead: CrmLead) => void }) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
   return (
-    <Card ref={setNodeRef} className={cn("min-h-[520px] min-w-72 p-4", isOver && "border-accent")}>
-      <header className="mb-4 flex items-center justify-between gap-3"><h2 className="text-sm font-semibold">{column.title}</h2><span className="rounded-full bg-sidebar px-2 py-0.5 text-xs text-slate-400">{leads.length}</span></header>
-      <div className="space-y-3">{leads.map((lead) => <LeadCard key={lead.id} lead={lead} onOpenLead={onOpenLead} />)}</div>
+    <Card ref={setNodeRef} className={cn("flex max-h-[calc(100vh-280px)] min-h-[420px] w-[238px] shrink-0 flex-col p-3", isOver && "border-accent")}>
+      <header className="mb-3 flex min-h-10 items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold leading-5">{column.title}</h2>
+        <span className="rounded-full bg-sidebar px-2 py-0.5 text-xs text-slate-400">{leads.length}</span>
+      </header>
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">{leads.map((lead) => <LeadCard key={lead.id} lead={lead} onOpenLead={onOpenLead} />)}</div>
     </Card>
   );
 }
@@ -79,7 +82,15 @@ export function CrmPipelineKanban({ leads, onMove, onOpenLead }: { leads: CrmLea
     const stage = pipelineColumns.find((item) => item.id === over?.id)?.id;
     if (lead && stage && lead.stage !== stage) onMove(lead, stage);
   }
-  return <DndContext sensors={sensors} onDragEnd={onDragEnd}><div className="flex gap-4 overflow-x-auto pb-4">{pipelineColumns.map((column) => <PipelineColumn key={column.id} column={column} leads={leads.filter((lead) => lead.stage === column.id)} onOpenLead={onOpenLead} />)}</div></DndContext>;
+  return (
+    <DndContext sensors={sensors} onDragEnd={onDragEnd}>
+      <div className="-mx-4 overflow-x-auto px-4 pb-4 md:-mx-8 md:px-8">
+        <div className="flex w-max gap-3">
+          {pipelineColumns.map((column) => <PipelineColumn key={column.id} column={column} leads={leads.filter((lead) => lead.stage === column.id)} onOpenLead={onOpenLead} />)}
+        </div>
+      </div>
+    </DndContext>
+  );
 }
 
 function ProjectCard({ project }: { project: CrmProject }) {

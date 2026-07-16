@@ -11,6 +11,7 @@ enum UserRole {
   ADMIN
   MANAGER
   USER
+  PARTNER
 }
 
 enum ClientType {
@@ -275,6 +276,8 @@ model User {
   passwordHash             String
   role                     UserRole                      @default(USER)
   avatarUrl                String?
+  partnerId                String?
+  partner                  Partner?                     @relation(fields: [partnerId], references: [id], onDelete: SetNull)
   theme                    String                        @default("dark")
   notifications            Boolean                       @default(true)
   createdAt                DateTime                      @default(now())
@@ -308,6 +311,7 @@ model User {
   partners                 Partner[]
   partnerInteractions      PartnerInteraction[]
 
+  @@index([partnerId])
   @@map("usuarios")
 }
 
@@ -662,6 +666,7 @@ model Partner {
   updatedAt            DateTime             @updatedAt
   projectLinks         PartnerProject[]
   interactions         PartnerInteraction[]
+  users                User[]
 
   @@index([ownerId, status])
   @@index([ownerId, name])

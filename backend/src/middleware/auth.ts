@@ -7,7 +7,8 @@ import { ApiError } from "../utils/api-error.js";
 const tokenPayloadSchema = z.object({
   sub: z.string(),
   email: z.string().email(),
-  role: z.enum(["ADMIN", "MANAGER", "USER"])
+  role: z.enum(["ADMIN", "MANAGER", "USER", "PARTNER"]),
+  partnerId: z.string().nullable().optional()
 });
 
 export const requireAuth: RequestHandler = (request, _response, next) => {
@@ -21,7 +22,7 @@ export const requireAuth: RequestHandler = (request, _response, next) => {
     const token = authorization.slice(7);
     const decoded = jwt.verify(token, env.JWT_SECRET);
     const payload = tokenPayloadSchema.parse(decoded);
-    request.auth = { userId: payload.sub, email: payload.email, role: payload.role };
+    request.auth = { userId: payload.sub, email: payload.email, role: payload.role, partnerId: payload.partnerId ?? null };
     next();
   } catch {
     next(new ApiError(401, "Token invalido ou expirado."));

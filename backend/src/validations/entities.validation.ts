@@ -208,17 +208,25 @@ export const userCreateSchema = z.object({
   name: z.string().min(2),
   email: z.string().email(),
   password: z.string().min(6),
-  role: z.enum(["ADMIN", "MANAGER", "USER"]).default("USER"),
+  role: z.enum(["ADMIN", "MANAGER", "USER", "PARTNER"]).default("USER"),
   theme: z.enum(["dark", "light"]).default("dark"),
-  notifications: z.boolean().default(true)
+  notifications: z.boolean().default(true),
+  partnerId: optionalText
+}).refine((data) => data.role !== "PARTNER" || Boolean(data.partnerId), {
+  message: "Selecione o parceiro vinculado ao usuario parceiro.",
+  path: ["partnerId"]
 });
 export const userAdminUpdateSchema = z.object({
   name: z.string().min(2).optional(),
   email: z.string().email().optional(),
   password: z.string().min(6).optional(),
-  role: z.enum(["ADMIN", "MANAGER", "USER"]).optional(),
+  role: z.enum(["ADMIN", "MANAGER", "USER", "PARTNER"]).optional(),
   theme: z.enum(["dark", "light"]).optional(),
-  notifications: z.boolean().optional()
+  notifications: z.boolean().optional(),
+  partnerId: optionalText
+}).refine((data) => data.role !== "PARTNER" || Boolean(data.partnerId), {
+  message: "Selecione o parceiro vinculado ao usuario parceiro.",
+  path: ["partnerId"]
 });
 
 export const productServiceSchema = z.object({

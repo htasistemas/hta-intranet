@@ -5,7 +5,7 @@ export type ProjectStatus = "PLANNING" | "ACTIVE" | "ON_HOLD" | "COMPLETED" | "C
 export type ProductType = "PRODUCT" | "SERVICE" | "SUBSCRIPTION" | "LICENSE" | "PROJECT";
 export type ProductStatus = "ACTIVE" | "INACTIVE";
 export type ClientProductStatus = "ACTIVE" | "SUSPENDED" | "CANCELLED" | "EXPIRED";
-export type UserRole = "ADMIN" | "MANAGER" | "USER";
+export type UserRole = "ADMIN" | "MANAGER" | "USER" | "PARTNER";
 export type ClientCommunicationStatus = "DRAFT" | "QUEUED" | "SENDING" | "SENT" | "DELIVERED" | "READ" | "FAILED" | "CANCELLED";
 export type ClientCommunicationChannel = "EMAIL" | "WHATSAPP";
 export type PartnerType = "REFERRAL" | "RESELLER" | "IMPLEMENTATION" | "STRATEGIC" | "AFFILIATE";
@@ -18,6 +18,8 @@ export interface UserAccount {
   name: string;
   email: string;
   role: UserRole;
+  partnerId?: string | null;
+  partner?: Partner | null;
   theme: "dark" | "light";
   notifications: boolean;
   createdAt: string;
@@ -202,7 +204,8 @@ export interface Partner {
   updatedAt: string;
   projectLinks?: Array<{ project: Project }>;
   interactions?: PartnerInteraction[];
-  _count?: { projectLinks: number; interactions: number };
+  users?: Array<{ id: string; name: string; email: string; role: UserRole }>;
+  _count?: { projectLinks: number; interactions: number; users?: number };
 }
 
 export interface PartnerInteraction {
@@ -252,7 +255,7 @@ export interface DashboardData {
 export interface Session {
   accessToken: string;
   refreshToken: string;
-  user: { id: string; name: string; email: string; role: UserRole };
+  user: { id: string; name: string; email: string; role: UserRole; partnerId?: string | null };
 }
 
 export interface PageResult<T> {

@@ -7,7 +7,7 @@ import { DashboardService } from "../services/dashboard.service.js";
 import { SearchService } from "../services/search.service.js";
 import bcrypt from "bcryptjs";
 
-type UserRoleInput = "ADMIN" | "MANAGER" | "USER";
+type UserRoleInput = "ADMIN" | "MANAGER" | "USER" | "PARTNER";
 
 interface UserAdminUpdateInput {
   name?: string;
@@ -16,7 +16,21 @@ interface UserAdminUpdateInput {
   role?: UserRoleInput;
   theme?: "dark" | "light";
   notifications?: boolean;
+  partnerId?: string | null;
 }
+
+const userAccountSelect = {
+  id: true,
+  name: true,
+  email: true,
+  role: true,
+  partnerId: true,
+  partner: true,
+  theme: true,
+  notifications: true,
+  createdAt: true,
+  updatedAt: true
+} satisfies Prisma.UserSelect;
 
 function userId(request: Request): string {
   if (!request.auth) throw new ApiError(401, "Nao autenticado.");
@@ -240,28 +254,40 @@ export class UtilityController {
   };
 
   public profile = async (request: Request, response: Response): Promise<void> => {
-    const user = await prisma.user.findUnique({ where: { id: userId(request) }, omit: { passwordHash: true } });
+    const user = await prisma.user.findUnique({ where: { id: userId(request) }, select: userAccountSelect });
     response.json(user);
   };
 
   public updateProfile = async (request: Request, response: Response): Promise<void> => {
-    response.json(await prisma.user.update({ where: { id: userId(request) }, data: request.body, omit: { passwordHash: true } }));
+    response.json(await prisma.user.update({ where: { id: userId(request) }, data: request.body, select: userAccountSelect }));
   };
 
   public users = async (_request: Request, response: Response): Promise<void> => {
-    response.json(await prisma.user.findMany({ omit: { passwordHash: true }, orderBy: { createdAt: "desc" } }));
+    response.json(await prisma.user.findMany({ select: userAccountSelect, orderBy: { createdAt: "desc" } }));
   };
 
   public createUser = async (request: Request, response: Response): Promise<void> => {
-    const { password, ...data } = request.body as { name: string; email: string; password: string; role: UserRoleInput; theme: "dark" | "light"; notifications: boolean };
-    response.status(201).json(await prisma.user.create({ data: { ...data, passwordHash: await bcrypt.hash(password, 12) }, omit: { passwordHash: true } }));
+    const { password, partnerId, role, ...data } = request.body as { name: string; email: string; password: string; role: UserRoleInput; theme: "dark" | "light"; notifications: boolean; partnerId?: string | null };
+    if (role === "PARTNER" && !partnerId) throw new ApiError(400, "Selecione o parceiro vinculado.");
+    if (partnerId) {
+      const partner = await prisma.partner.findUnique({ where: { id: partnerId } });
+      if (!partner) throw new ApiError(404, "Parceiro nao encontrado.");
+    }
+    response.status(201).json(await prisma.user.create({ data: { ...data, role, partnerId: role === "PARTNER" ? partnerId : null, passwordHash: await bcrypt.hash(password, 12) }, select: userAccountSelect }));
   };
 
   public updateUser = async (request: Request, response: Response): Promise<void> => {
-    const { password, ...data } = request.body as UserAdminUpdateInput;
+    const { password, partnerId, role, ...data } = request.body as UserAdminUpdateInput;
+    if (role === "PARTNER" && !partnerId) throw new ApiError(400, "Selecione o parceiro vinculado.");
+    if (partnerId) {
+      const partner = await prisma.partner.findUnique({ where: { id: partnerId } });
+      if (!partner) throw new ApiError(404, "Parceiro nao encontrado.");
+    }
     const updateData: Prisma.UserUpdateInput = { ...data };
+    if (role) updateData.role = role;
+    if (role) updateData.partner = role === "PARTNER" && partnerId ? { connect: { id: partnerId } } : { disconnect: true };
     if (password) updateData.passwordHash = await bcrypt.hash(password, 12);
-    response.json(await prisma.user.update({ where: { id: resourceId(request) }, data: updateData, omit: { passwordHash: true } }));
+    response.json(await prisma.user.update({ where: { id: resourceId(request) }, data: updateData, select: userAccountSelect }));
   };
 
   public deleteUser = async (request: Request, response: Response): Promise<void> => {
