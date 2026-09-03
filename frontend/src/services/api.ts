@@ -1,7 +1,7 @@
 import type { Session } from "@/types";
 
 export const API_URL = import.meta.env.VITE_API_URL ?? "/api";
-const SESSION_KEY = "amtbrasil.session";
+const SESSION_KEY = "torresoft.session";
 
 export function storedSession(): Session | null {
   const raw = localStorage.getItem(SESSION_KEY);

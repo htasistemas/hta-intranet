@@ -16,9 +16,9 @@ async function seed(): Promise<void> {
   }
   const admin = await prisma.user.upsert({
     where: { email: adminEmail },
-    update: { name: "Administrador HTA Sistemas", passwordHash },
+    update: { name: "Administrador Torresoft", passwordHash },
     create: {
-      name: "Administrador HTA Sistemas",
+      name: "Administrador Torresoft",
       email: adminEmail,
       passwordHash,
       role: UserRole.ADMIN
@@ -97,7 +97,7 @@ async function seed(): Promise<void> {
         margin: 54.16,
         sla: "Atendimento em ate 8 horas uteis",
         deliveryTime: "60 dias",
-        technicalOwner: "Equipe HTA"
+        technicalOwner: "Equipe Torresoft"
       }
     }),
     prisma.productService.create({

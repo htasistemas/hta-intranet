@@ -3,7 +3,7 @@ import { prisma } from "./prisma/client.js";
 import { env } from "./utils/env.js";
 
 const server = app.listen(env.PORT, () => {
-  console.log(`AMT Brasil API disponivel em http://localhost:${env.PORT}`);
+  console.log(`Torresoft API disponivel em http://localhost:${env.PORT}`);
 });
 
 async function shutdown(): Promise<void> {

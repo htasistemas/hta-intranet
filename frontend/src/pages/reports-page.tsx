@@ -8,7 +8,7 @@ import { useToast } from "@/contexts/toast-context";
 export default function ReportsPage() {
   const { toast } = useToast();
   const download = async (type: "pdf" | "csv") => {
-    try { await api.download(`/reports/clients.${type}`, `amtbrasil-clientes.${type}`); toast("Arquivo gerado com sucesso."); }
+    try { await api.download(`/reports/clients.${type}`, `torresoft-clientes.${type}`); toast("Arquivo gerado com sucesso."); }
     catch (error) { toast(error instanceof Error ? error.message : "Falha no relatorio.", "error"); }
   };
   return (

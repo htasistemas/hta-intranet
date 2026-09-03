@@ -53,7 +53,7 @@ Copie o arquivo `.dump` gerado no teste para a pasta `backups/` do servidor de p
 Exemplo com `scp`:
 
 ```bash
-scp backups/teste-YYYYMMDD-HHMMSS.dump usuario@servidor:/caminho/hta-intranet/backups/
+scp backups/teste-YYYYMMDD-HHMMSS.dump usuario@servidor:/home/srv/hta-intranet/backups/
 ```
 
 ## Restaurar na producao
@@ -99,8 +99,8 @@ docker compose --env-file .env.production -f docker-compose.prod.yml up -d --bui
 Confira a aplicacao:
 
 ```bash
-curl -I https://intranet.htasistemas.com.br
-curl -I https://intranet.htasistemas.com.br/health
+curl -I https://intranet.torresoftbrasil.com.br
+curl -I https://intranet.torresoftbrasil.com.br/health
 ```
 
 ## Restaurar localmente para testar um dump

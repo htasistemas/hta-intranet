@@ -29,15 +29,15 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
       PORT: 3333
-      FRONTEND_URL: https://intranet.htasistemas.com.br
-      EMAIL_TRACKING_BASE_URL: ${EMAIL_TRACKING_BASE_URL:-https://intranet.htasistemas.com.br}
+      FRONTEND_URL: https://intranet.torresoftbrasil.com.br
+      EMAIL_TRACKING_BASE_URL: ${EMAIL_TRACKING_BASE_URL:-https://intranet.torresoftbrasil.com.br}
       JWT_SECRET: ${JWT_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN}
       APP_EMAIL_HABILITADO: ${APP_EMAIL_HABILITADO:-false}
       APP_EMAIL_REMETENTE: ${APP_EMAIL_REMETENTE:-}
-      APP_EMAIL_NOME: ${APP_EMAIL_NOME:-HTA Sistemas}
+      APP_EMAIL_NOME: ${APP_EMAIL_NOME:-Torresoft}
       MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
       MAIL_PORT: ${MAIL_PORT:-587}
       MAIL_USER: ${MAIL_USER:-}

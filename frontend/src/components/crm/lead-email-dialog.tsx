@@ -32,7 +32,7 @@ const statusLabels: Record<CommunicationMessage["status"], string> = {
 };
 
 function defaultBody(lead: CrmLead): string {
-  return `Olá ${lead.name},\n\nGostaríamos de apresentar as soluções da HTA Sistemas e entender como podemos apoiar sua empresa.\n\nPodemos agendar uma conversa?\n\nAtenciosamente,\nHTA Sistemas`;
+  return `Olá ${lead.name},\n\nGostaríamos de apresentar as soluções da Torresoft e entender como podemos apoiar sua empresa.\n\nPodemos agendar uma conversa?\n\nAtenciosamente,\nTorresoft`;
 }
 
 export function LeadEmailDialog({ lead, onClose }: { lead?: CrmLead; onClose: () => void }) {
@@ -50,12 +50,12 @@ export function LeadEmailDialog({ lead, onClose }: { lead?: CrmLead; onClose: ()
   });
   const form = useForm<EmailInput>({
     resolver: zodResolver(emailSchema),
-    defaultValues: { templateId: "", subject: "Apresentação comercial - HTA Sistemas", body: "" }
+    defaultValues: { templateId: "", subject: "Apresentação comercial - Torresoft", body: "" }
   });
 
   useEffect(() => {
     if (!lead) return;
-    form.reset({ templateId: "", subject: "Apresentação comercial - HTA Sistemas", body: defaultBody(lead) });
+    form.reset({ templateId: "", subject: "Apresentação comercial - Torresoft", body: defaultBody(lead) });
   }, [form, lead]);
 
   const send = useMutation({
@@ -97,7 +97,7 @@ export function LeadEmailDialog({ lead, onClose }: { lead?: CrmLead; onClose: ()
     form.setValue("templateId", templateId);
     const template = emailTemplates.find((item) => item.id === templateId);
     if (!template) return;
-    form.setValue("subject", template.subject ?? "Contato comercial - HTA Sistemas", { shouldValidate: true });
+    form.setValue("subject", template.subject ?? "Contato comercial - Torresoft", { shouldValidate: true });
     form.setValue("body", template.body, { shouldValidate: true });
   };
 

@@ -1,4 +1,4 @@
-# AMT Brasil
+# Torresoft Intranet
 
 Plataforma full stack para controle de clientes, agenda e gestao pessoal, com interface dark corporativa e API REST segura.
 
@@ -22,7 +22,7 @@ Plataforma full stack para controle de clientes, agenda e gestao pessoal, com in
 ## Arquitetura
 
 ```text
-amtbrasil/
+torresoft/
   frontend/src/
     components/  contexts/  hooks/  layouts/  lib/  pages/  services/  types/
   backend/
@@ -39,7 +39,7 @@ O backend separa entrada HTTP (`controllers`/`routes`), regras de aplicacao (`se
 
 ## Instalacao
 
-Na raiz `amtbrasil`:
+Na raiz `torresoft`:
 
 ```bash
 cp backend/.env.example backend/.env
@@ -147,3 +147,15 @@ Antes do deploy:
 5. Restrinja `FRONTEND_URL`, adicione observabilidade e politica de armazenamento para anexos.
 
 O sistema implementa a base funcional e as medidas de seguranca aplicacionais; operacao realmente produtiva depende desses controles de infraestrutura.
+
+## Deploy Hostinger
+
+O deploy de producao da intranet Torresoft usa Docker Compose com nomes isolados para nao interferir em outros sistemas do servidor:
+
+- Diretorio sugerido: `/home/srv/torresoft-intranet`
+- URL publica: `https://intranet.torresoftbrasil.com.br`
+- Porta local publicada pelo container frontend: `127.0.0.1:8081`
+- Containers de producao existentes: `hta-intranet-postgres`, `hta-intranet-backend`, `hta-intranet-frontend`
+- Volume PostgreSQL existente: `hta_intranet_postgres`
+
+O proxy web da Hostinger deve encaminhar `intranet.torresoftbrasil.com.br` para `http://127.0.0.1:8081`, mantendo os demais sites e servicos existentes inalterados.

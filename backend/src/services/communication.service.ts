@@ -130,7 +130,7 @@ async function sendSmtp(message: { recipient: string; recipientName: string | nu
   const result = await transporter.sendMail({
     from: { address: fromAddress, name: env.APP_EMAIL_NOME ?? fromAddress },
     to: message.recipientName ? { address: message.recipient, name: message.recipientName } : message.recipient,
-    subject: message.subject ?? "Contato HTA Sistemas",
+    subject: message.subject ?? "Contato Torresoft",
     text: message.body,
     html: `${message.body.replace(/\n/g, "<br />")}${message.trackingToken ? `<img src="${publicBaseUrl}/api/communication/track/open/${encodeURIComponent(message.trackingToken)}.gif" width="1" height="1" alt="" style="display:block;width:1px;height:1px;border:0" />` : ""}`
   });

@@ -92,7 +92,7 @@ const partnerNavigation: NavigationGroup[] = [
   }
 ];
 
-const sidebarStorageKey = "htasistemas.sidebar.collapsed";
+const sidebarStorageKey = "torresoft.sidebar.collapsed";
 const routeTitles: Record<string, string> = { "/": "Dashboard", "/calculadora": "Calculadora", "/clientes": "Clientes" };
 
 function groupsInitiallyOpen(): Record<string, boolean> {
@@ -152,7 +152,7 @@ export function AppLayout() {
         <div className={cn("flex h-20 items-center border-b border-slate-700/60 px-4", collapsed ? "lg:justify-center" : "justify-between")}>
           <Link
             to="/"
-            title="HTA Sistemas"
+            title="Torresoft"
             className={cn("flex min-w-0 items-center gap-3", collapsed && "lg:justify-center")}
             onClick={() => setMobileOpened(false)}
           >
@@ -160,7 +160,7 @@ export function AppLayout() {
               <Sparkles size={20} />
             </span>
             <div className={cn("min-w-0", collapsed && "lg:hidden")}>
-              <div className="font-bold">HTA <span className="gradient-text">Sistemas</span></div>
+              <div className="font-bold"><span className="gradient-text">Torresoft</span></div>
               <div className="text-xs text-slate-400">Workspace premium</div>
             </div>
           </Link>

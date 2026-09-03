@@ -277,7 +277,7 @@ model User {
   role                     UserRole                      @default(USER)
   avatarUrl                String?
   partnerId                String?
-  partner                  Partner?                     @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+  partner                  Partner?                     @relation("PartnerAccount", fields: [partnerId], references: [id], onDelete: SetNull)
   theme                    String                        @default("dark")
   notifications            Boolean                       @default(true)
   createdAt                DateTime                      @default(now())
@@ -308,7 +308,7 @@ model User {
   crmSlaRules              CrmSlaRule[]
   products                 ProductService[]
   clientProducts           ClientProduct[]
-  partners                 Partner[]
+  partners                 Partner[]                    @relation("PartnerOwner")
   partnerInteractions      PartnerInteraction[]
 
   @@index([partnerId])
@@ -636,7 +636,7 @@ model ClientProject {
 model Partner {
   id                   String               @id @default(cuid())
   ownerId              String
-  owner                User                 @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  owner                User                 @relation("PartnerOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   name                 String
   company              String?
   document             String?
@@ -666,7 +666,7 @@ model Partner {
   updatedAt            DateTime             @updatedAt
   projectLinks         PartnerProject[]
   interactions         PartnerInteraction[]
-  users                User[]
+  users                User[]               @relation("PartnerAccount")
 
   @@index([ownerId, status])
   @@index([ownerId, name])

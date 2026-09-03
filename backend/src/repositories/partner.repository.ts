@@ -12,10 +12,8 @@ const partnerInclude = {
 
 export class PartnerRepository {
   public async list(ownerId: string, query: ListQuery) {
-    const where: Prisma.PartnerWhereInput = {
-      AND: [
-        { OR: [{ ownerId }, { users: { some: { id: ownerId } } }] },
-        ...(query.search ? [{
+    const searchWhere: Prisma.PartnerWhereInput | undefined = query.search
+      ? {
           OR: [
             { name: { contains: query.search, mode: "insensitive" } },
             { company: { contains: query.search, mode: "insensitive" } },
@@ -23,7 +21,12 @@ export class PartnerRepository {
             { email: { contains: query.search, mode: "insensitive" } },
             { segment: { contains: query.search, mode: "insensitive" } }
           ]
-        }] : [])
+        }
+      : undefined;
+    const where: Prisma.PartnerWhereInput = {
+      AND: [
+        { OR: [{ ownerId }, { users: { some: { id: ownerId } } }] },
+        ...(searchWhere ? [searchWhere] : [])
       ]
     };
     const [data, total] = await prisma.$transaction([

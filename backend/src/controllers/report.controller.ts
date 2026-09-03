@@ -46,6 +46,6 @@ export class ReportController {
     const clients = await prisma.client.findMany({ where: { ownerId: userId(request) }, take: 25, orderBy: { name: "asc" } });
     response.header("Content-Type", "application/pdf");
     response.header("Content-Disposition", "attachment; filename=clientes.pdf");
-    response.send(createPdf(["AMT Brasil - Relatorio de clientes", ...clients.map((client) => `${client.name} - ${client.status}`)]));
+    response.send(createPdf(["Torresoft - Relatorio de clientes", ...clients.map((client) => `${client.name} - ${client.status}`)]));
   };
 }

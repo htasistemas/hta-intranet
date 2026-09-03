@@ -48,7 +48,7 @@ async function sendPasswordResetEmail(input: { email: string; name: string; link
   await transporter.sendMail({
     from: { address: fromAddress, name: env.APP_EMAIL_NOME ?? fromAddress },
     to: { address: input.email, name: input.name },
-    subject: "Redefinicao de senha - HTA Sistemas",
+    subject: "Redefinicao de senha - Torresoft",
     text: `Use este link para redefinir sua senha: ${input.link}`,
     html: `<p>Ola ${input.name},</p><p>Use o link abaixo para redefinir sua senha:</p><p><a href="${input.link}">${input.link}</a></p><p>Este link expira em 1 hora.</p>`
   });

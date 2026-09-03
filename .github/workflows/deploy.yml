@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   deploy:
-    name: Atualizar intranet.htasistemas.com.br
+    name: Atualizar intranet.torresoftbrasil.com.br
     runs-on:
       - self-hosted
       - hta-intranet
@@ -83,6 +83,16 @@ jobs:
             -f docker-compose.prod.yml \
             config --quiet
 
+      - name: Remover stack temporario com nome Torresoft
+        working-directory: /home/srv/hta-intranet
+        run: |
+          set -euo pipefail
+          docker compose \
+            --project-name intranet-torresoft \
+            --env-file .env.production \
+            -f docker-compose.prod.yml \
+            down --remove-orphans || true
+
       - name: Construir e atualizar servicos
         working-directory: /home/srv/hta-intranet
         env:
@@ -109,9 +119,54 @@ jobs:
             -f docker-compose.prod.yml \
             exec -T backend npm exec -w backend prisma migrate deploy
 
+      - name: Configurar proxy publico da intranet
+        run: |
+          set -euo pipefail
+          if ! command -v nginx >/dev/null 2>&1; then
+            echo "Nginx nao encontrado no host; pulando configuracao do proxy publico."
+            exit 0
+          fi
+          if ! sudo -n true 2>/dev/null; then
+            echo "Usuario do runner nao possui sudo sem senha; configure o vhost manualmente."
+            exit 0
+          fi
+          sudo tee /etc/nginx/sites-available/intranet-torresoft >/dev/null <<'NGINX'
+          server {
+            listen 80;
+            server_name intranet.torresoftbrasil.com.br;
+
+            location / {
+              proxy_pass http://127.0.0.1:8081;
+              proxy_http_version 1.1;
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $scheme;
+            }
+          }
+          NGINX
+          sudo ln -sfn /etc/nginx/sites-available/intranet-torresoft /etc/nginx/sites-enabled/intranet-torresoft
+          sudo nginx -t
+          sudo systemctl reload nginx
+          if command -v certbot >/dev/null 2>&1 && [ ! -d /etc/letsencrypt/live/intranet.torresoftbrasil.com.br ]; then
+            sudo certbot --nginx \
+              --non-interactive \
+              --agree-tos \
+              --register-unsafely-without-email \
+              --redirect \
+              -d intranet.torresoftbrasil.com.br
+          fi
+
       - name: Validar deploy
         run: |
           set -euo pipefail
           curl --fail --silent --show-error \
             --retry 10 --retry-delay 3 --retry-all-errors \
             http://127.0.0.1:8081/health
+          curl --fail --silent --show-error \
+            --retry 10 --retry-delay 3 --retry-all-errors \
+            --header "Host: intranet.torresoftbrasil.com.br" \
+            http://127.0.0.1/health
+          curl --fail --silent --show-error \
+            --retry 10 --retry-delay 3 --retry-all-errors \
+            https://intranet.torresoftbrasil.com.br/health

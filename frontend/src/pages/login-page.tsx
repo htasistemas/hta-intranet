@@ -125,7 +125,7 @@ export default function LoginPage() {
         <div className="p-8">
           <div className="mb-8 flex items-center gap-3">
             <span className="gradient-fill grid h-12 w-12 place-items-center rounded-2xl"><Sparkles /></span>
-            <div><h1 className="text-xl font-bold">HTA <span className="gradient-text">Sistemas</span></h1><p className="text-sm text-slate-400">Entre na sua central de gestao</p></div>
+            <div><h1 className="text-xl font-bold"><span className="gradient-text">Torresoft</span></h1><p className="text-sm text-slate-400">Entre na sua central de gestao</p></div>
           </div>
 
           {mode === "login" ? (

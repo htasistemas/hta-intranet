@@ -1,21 +1,21 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: amtbrasil-postgres
+    container_name: torresoft-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: amtbrasil
-      POSTGRES_USER: amtbrasil
-      POSTGRES_PASSWORD: amtbrasil
+      POSTGRES_DB: torresoft
+      POSTGRES_USER: torresoft
+      POSTGRES_PASSWORD: torresoft
     ports:
       - "5432:5432"
     volumes:
-      - amtbrasil_postgres:/var/lib/postgresql/data
+      - torresoft_postgres:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U amtbrasil -d amtbrasil"]
+      test: ["CMD-SHELL", "pg_isready -U torresoft -d torresoft"]
       interval: 5s
       timeout: 5s
       retries: 10
 
 volumes:
-  amtbrasil_postgres:
+  torresoft_postgres:

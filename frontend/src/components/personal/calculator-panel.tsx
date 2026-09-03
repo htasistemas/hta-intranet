@@ -11,7 +11,7 @@ interface Calculation {
   result: string;
 }
 
-const historyStorageKey = "amtbrasil.calculator.history";
+const historyStorageKey = "torresoft.calculator.history";
 const operatorLabels: Record<Operator, string> = { "+": "+", "-": "-", "*": "x", "/": "/" };
 const numberFormatter = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 10 });
 

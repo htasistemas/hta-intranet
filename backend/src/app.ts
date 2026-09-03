@@ -13,7 +13,7 @@ app.use(cors({ origin: env.FRONTEND_URL, credentials: true }));
 app.use(express.json({ limit: "2mb" }));
 app.use(rateLimit({ windowMs: 60 * 1000, limit: 180, standardHeaders: true, legacyHeaders: false }));
 app.get("/", (_request, response) => response.json({
-  name: "AMT Brasil API",
+  name: "Torresoft API",
   status: "online",
   health: "/health",
   documentation: "/api/docs",

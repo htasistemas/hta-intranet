@@ -68,7 +68,7 @@ export const apiRouter = Router();
 
 const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false });
 apiRouter.get("/", (_request, response) => response.json({
-  name: "AMT Brasil API",
+  name: "Torresoft API",
   version: SYSTEM_VERSION,
   documentation: "/api/docs",
   authentication: "/api/auth/login"

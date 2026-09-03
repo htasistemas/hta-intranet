@@ -1,4 +1,4 @@
-# Deploy em intranet.htasistemas.com.br
+# Deploy em intranet.torresoftbrasil.com.br
 
 Este guia publica o sistema em uma VPS com Docker e usa o Cloudflare como DNS/proxy.
 
@@ -33,22 +33,22 @@ Teste no servidor:
 curl http://127.0.0.1:8081/health
 ```
 
-## 2. Mesmo servidor do g3n.htasistemas.com.br
+## 2. Mesmo servidor de outros servicos
 
-Como a intranet vai rodar no mesmo servidor do `g3n.htasistemas.com.br`, o container publica a aplicacao somente em:
+Como a intranet vai rodar no mesmo servidor de outros servicos, o container publica a aplicacao somente em:
 
 ```text
 http://127.0.0.1:8081
 ```
 
-Assim, ele nao disputa as portas publicas `80` e `443` com o site atual. O Nginx, Apache, Caddy ou outro proxy principal do servidor deve receber `intranet.htasistemas.com.br` e encaminhar para `127.0.0.1:8081`.
+Assim, ele nao disputa as portas publicas `80` e `443` com os sites atuais. O Nginx, Apache, Caddy ou outro proxy principal do servidor deve receber `intranet.torresoftbrasil.com.br` e encaminhar para `127.0.0.1:8081`.
 
 Exemplo com Nginx no host:
 
 ```nginx
 server {
   listen 80;
-  server_name intranet.htasistemas.com.br;
+  server_name intranet.torresoftbrasil.com.br;
 
   location / {
     proxy_pass http://127.0.0.1:8081;
@@ -71,22 +71,16 @@ sudo systemctl reload nginx
 Se usar Certbot:
 
 ```bash
-sudo certbot --nginx -d intranet.htasistemas.com.br
+sudo certbot --nginx -d intranet.torresoftbrasil.com.br
 ```
 
 ## 3. Cloudflare DNS
 
-No Cloudflare, em `htasistemas.com.br`:
+No Cloudflare, em `torresoftbrasil.com.br`:
 
 | Tipo | Nome | Conteudo | Proxy |
 | --- | --- | --- | --- |
 | A | `intranet` | IP publico da VPS | Proxied |
-
-Como esta no mesmo servidor do `g3n.htasistemas.com.br`, tambem pode usar CNAME:
-
-| Tipo | Nome | Target | Proxy |
-| --- | --- | --- | --- |
-| CNAME | `intranet` | `g3n.htasistemas.com.br` | Proxied |
 
 Se o provedor der um hostname em vez de IP, use `CNAME`:
 
@@ -108,8 +102,8 @@ Para teste inicial sem TLS no servidor, `Flexible` pode funcionar, mas nao e rec
 Acesse:
 
 ```text
-https://intranet.htasistemas.com.br
-https://intranet.htasistemas.com.br/health
+https://intranet.torresoftbrasil.com.br
+https://intranet.torresoftbrasil.com.br/health
 ```
 
 ## 6. Atualizacao
