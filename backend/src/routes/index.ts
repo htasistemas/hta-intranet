@@ -10,6 +10,7 @@ import { CommunicationController } from "../controllers/communication.controller
 import { ProductController } from "../controllers/product.controller.js";
 import { PartnerController } from "../controllers/partner.controller.js";
 import { BackupController } from "../controllers/backup.controller.js";
+import { SystemMonitorController } from "../controllers/system-monitor.controller.js";
 import { asyncHandler } from "../utils/async-handler.js";
 import { validateBody } from "../middleware/validate.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -45,6 +46,7 @@ import {
   taskSchema,
   userAdminUpdateSchema,
   userCreateSchema,
+  systemMonitorSchema,
   userUpdateSchema
 } from "../validations/entities.validation.js";
 import { forgotPasswordSchema, googleLoginSchema, loginSchema, refreshSchema, resetPasswordSchema } from "../validations/auth.validation.js";
@@ -64,6 +66,7 @@ const communication = new CommunicationController();
 const products = new ProductController();
 const partners = new PartnerController();
 const backups = new BackupController();
+const systemMonitors = new SystemMonitorController();
 export const apiRouter = Router();
 
 const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false });
@@ -145,6 +148,12 @@ apiRouter.put("/users/:id", requireAdmin, validateBody(userAdminUpdateSchema), a
 apiRouter.delete("/users/:id", requireAdmin, asyncHandler(utility.deleteUser));
 apiRouter.post("/backups", requireAdmin, asyncHandler(backups.create));
 apiRouter.post("/backups/restore", requireAdmin, raw({ type: "application/octet-stream", limit: "500mb" }), asyncHandler(backups.restore));
+apiRouter.get("/system-monitors", asyncHandler(systemMonitors.list));
+apiRouter.post("/system-monitors/check", asyncHandler(systemMonitors.checkAll));
+apiRouter.post("/system-monitors/:id/check", asyncHandler(systemMonitors.checkOne));
+apiRouter.post("/system-monitors", validateBody(systemMonitorSchema), asyncHandler(systemMonitors.create));
+apiRouter.put("/system-monitors/:id", validateBody(systemMonitorSchema), asyncHandler(systemMonitors.update));
+apiRouter.delete("/system-monitors/:id", asyncHandler(systemMonitors.delete));
 apiRouter.get("/reports/clients.csv", asyncHandler(reports.clientsCsv));
 apiRouter.get("/reports/clients.pdf", asyncHandler(reports.clientsPdf));
 apiRouter.get("/crm/dashboard", asyncHandler(crm.dashboard));

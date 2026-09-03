@@ -269,6 +269,12 @@ enum CustomerRiskLevel {
   CRITICAL
 }
 
+enum SystemMonitorStatus {
+  UNKNOWN
+  ACTIVE
+  DOWN
+}
+
 model User {
   id                       String                        @id @default(cuid())
   name                     String
@@ -308,6 +314,7 @@ model User {
   crmSlaRules              CrmSlaRule[]
   products                 ProductService[]
   clientProducts           ClientProduct[]
+  systemMonitors           SystemMonitor[]
   partners                 Partner[]                    @relation("PartnerOwner")
   partnerInteractions      PartnerInteraction[]
 
@@ -620,6 +627,32 @@ model ClientProduct {
   @@index([clientId])
   @@index([productId])
   @@map("clientes_produtos")
+}
+
+model SystemMonitor {
+  id             String              @id @default(cuid())
+  ownerId        String
+  owner          User                @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name           String
+  url            String
+  checkPath      String              @default("/")
+  expectedStatus Int                 @default(200)
+  timeoutMs      Int                 @default(8000)
+  active         Boolean             @default(true)
+  status         SystemMonitorStatus @default(UNKNOWN)
+  lastCheckedAt  DateTime?
+  lastStatusCode Int?
+  responseTimeMs Int?
+  lastError      String?
+  lastOnlineAt   DateTime?
+  lastOfflineAt  DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@unique([ownerId, url])
+  @@index([ownerId, active])
+  @@index([ownerId, status])
+  @@map("sistemas_monitorados")
 }
 
 model ClientProject {

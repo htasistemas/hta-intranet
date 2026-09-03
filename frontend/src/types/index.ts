@@ -12,6 +12,7 @@ export type PartnerType = "REFERRAL" | "RESELLER" | "IMPLEMENTATION" | "STRATEGI
 export type PartnerStatus = "ACTIVE" | "INACTIVE" | "PROSPECTING" | "SUSPENDED";
 export type CommissionModel = "ONE_TIME" | "RECURRING" | "REVENUE_SHARE" | "PROJECT_BASED" | "HYBRID";
 export type PartnerInteractionType = "CALL" | "EMAIL" | "MEETING" | "WHATSAPP" | "NOTE" | "TRAINING" | "PROPOSAL" | "REVIEW";
+export type SystemMonitorStatus = "UNKNOWN" | "ACTIVE" | "DOWN";
 
 export interface UserAccount {
   id: string;
@@ -231,6 +232,32 @@ export interface ClientProduct {
   notes: string | null;
   client: Client;
   product: ProductService;
+}
+
+export interface SystemMonitor {
+  id: string;
+  ownerId: string;
+  name: string;
+  url: string;
+  checkPath: string;
+  expectedStatus: number;
+  timeoutMs: number;
+  active: boolean;
+  status: SystemMonitorStatus;
+  lastCheckedAt: string | null;
+  lastStatusCode: number | null;
+  responseTimeMs: number | null;
+  lastError: string | null;
+  lastOnlineAt: string | null;
+  lastOfflineAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SystemMonitorCheckResult {
+  monitor: SystemMonitor;
+  previousStatus: SystemMonitorStatus;
+  alert: boolean;
 }
 
 export interface DashboardData {

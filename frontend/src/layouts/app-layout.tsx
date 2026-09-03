@@ -22,6 +22,7 @@ import {
   Settings,
   Sparkles,
   LayoutDashboard,
+  MonitorCheck,
   UserCog,
   X,
   type LucideIcon
@@ -70,6 +71,7 @@ const navigation: NavigationGroup[] = [
       { label: "Gestao Pessoal", href: "/tarefas", icon: ClipboardList },
       { label: "CRM Comercial", href: "/crm-comercial", icon: Handshake },
       { label: "Portal Cliente", href: "/portal-cliente", icon: PanelsTopLeft },
+      { label: "Monitoramento", href: "/monitoramento", icon: MonitorCheck },
       { label: "Relatorios", href: "/relatorios", icon: FileBarChart }
     ]
   },

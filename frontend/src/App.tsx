@@ -21,6 +21,7 @@ const ReportsPage = lazy(() => import("@/pages/reports-page"));
 const SettingsPage = lazy(() => import("@/pages/settings-page"));
 const UsersPage = lazy(() => import("@/pages/users-page"));
 const BackupRestorePage = lazy(() => import("@/pages/backup-restore-page"));
+const SystemMonitorPage = lazy(() => import("@/pages/system-monitor-page"));
 
 function Loading() { return <div className="p-8"><Skeleton className="h-80" /></div>; }
 
@@ -50,6 +51,7 @@ export default function App() {
           <Route path="/backups" element={<Navigate to="/backup-restauracao" replace />} />
           <Route path="/backup-e-restauracao" element={<Navigate to="/backup-restauracao" replace />} />
           <Route path="/backup-restauracao" element={<BackupRestorePage />} />
+          <Route path="/monitoramento" element={<SystemMonitorPage />} />
           <Route path="/configuracoes" element={<SettingsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

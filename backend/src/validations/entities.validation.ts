@@ -258,6 +258,15 @@ export const clientProductSchema = z.object({
   notes: optionalText
 });
 
+export const systemMonitorSchema = z.object({
+  name: z.string().trim().min(2).max(120),
+  url: z.string().trim().url().transform((value) => value.replace(/\/+$/, "")),
+  checkPath: z.string().trim().min(1).max(200).default("/").transform((value) => value.startsWith("/") ? value : `/${value}`),
+  expectedStatus: z.coerce.number().int().min(100).max(599).default(200),
+  timeoutMs: z.coerce.number().int().min(1000).max(30000).default(8000),
+  active: z.boolean().default(true)
+});
+
 export const partnerSchema = z.object({
   name: z.string().trim().min(2).transform(normalizeTitleText),
   company: optionalTitleText(),
