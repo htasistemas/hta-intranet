@@ -28,7 +28,7 @@ jobs:
           set -euo pipefail
           git fetch origin master
           git checkout master
-          git merge --ff-only origin/master
+          git reset --hard origin/master
 
       - name: Sincronizar configuracao SMTP protegida
         working-directory: /home/srv/hta-intranet
