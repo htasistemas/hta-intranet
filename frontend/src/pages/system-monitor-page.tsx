@@ -76,6 +76,26 @@ function statusIcon(status: SystemMonitorStatus) {
   return <Clock3 size={17} />;
 }
 
+function playOutageAlert(): void {
+  const AudioContextClass = window.AudioContext;
+  const audioContext = new AudioContextClass();
+  const oscillator = audioContext.createOscillator();
+  const gain = audioContext.createGain();
+
+  oscillator.type = "sine";
+  oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
+  oscillator.frequency.setValueAtTime(660, audioContext.currentTime + 0.18);
+  gain.gain.setValueAtTime(0.001, audioContext.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.18, audioContext.currentTime + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.45);
+
+  oscillator.connect(gain);
+  gain.connect(audioContext.destination);
+  oscillator.start();
+  oscillator.stop(audioContext.currentTime + 0.5);
+  window.setTimeout(() => void audioContext.close(), 700);
+}
+
 function MonitorStatusBadge({ monitor }: { monitor: SystemMonitor }) {
   if (!monitor.active) {
     return <span className="inline-flex items-center gap-2 rounded-full border border-slate-600 bg-slate-700/30 px-3 py-1 text-xs text-slate-300"><Clock3 size={15} /> Pausado</span>;
@@ -123,7 +143,7 @@ export default function SystemMonitorPage() {
   const checkQuery = useQuery({
     queryKey: ["system-monitors", "check"],
     queryFn: () => api.post<SystemMonitorCheckResult[]>("/system-monitors/check", {}),
-    refetchInterval: 60000,
+    refetchInterval: 10000,
     enabled: Boolean(monitorsQuery.data)
   });
 
@@ -149,6 +169,11 @@ export default function SystemMonitorPage() {
       if (result.alert && !alertedOutages.current.has(result.monitor.id)) {
         alertedOutages.current.add(result.monitor.id);
         toast(`${result.monitor.name} saiu do ar.`, "error");
+        try {
+          playOutageAlert();
+        } catch {
+          toast("Som bloqueado pelo navegador ate haver interacao na pagina.", "error");
+        }
       }
       if (result.monitor.status === "ACTIVE") alertedOutages.current.delete(result.monitor.id);
     }
@@ -214,7 +239,7 @@ export default function SystemMonitorPage() {
 
       <section className="grid gap-4 xl:grid-cols-3">
         {monitorsQuery.isLoading ? Array.from({ length: 3 }, (_, index) => <Skeleton key={index} className="h-56" />) : monitors.map((monitor) => (
-          <Card key={monitor.id} className={cn("space-y-4", monitor.status === "DOWN" && monitor.active && "border-red-400/40 bg-red-950/20")}>
+          <Card key={monitor.id} className={cn("space-y-4", monitor.status === "DOWN" && monitor.active && "animate-pulse border-red-400/70 bg-red-950/30 shadow-[0_0_32px_rgba(248,113,113,0.22)]")}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
