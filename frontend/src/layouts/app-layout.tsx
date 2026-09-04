@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   CalendarDays,
+  BarChart3,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -13,15 +14,18 @@ import {
   Network,
   PanelsTopLeft,
   FileBarChart,
+  FileText,
   FolderKanban,
   LogOut,
   Mail,
   Menu,
   Package,
+  Plus,
   Search,
   Settings,
   Sparkles,
   LayoutDashboard,
+  LifeBuoy,
   MonitorCheck,
   UserCog,
   X,
@@ -73,6 +77,20 @@ const navigation: NavigationGroup[] = [
       { label: "Portal Cliente", href: "/portal-cliente", icon: PanelsTopLeft },
       { label: "Monitoramento", href: "/monitoramento", icon: MonitorCheck },
       { label: "Relatorios", href: "/relatorios", icon: FileBarChart }
+    ]
+  },
+  {
+    title: "Atendimento Tecnico",
+    icon: LifeBuoy,
+    items: [
+      { label: "Dashboard", href: "/atendimento", icon: BarChart3 },
+      { label: "Abrir Chamado", href: "/atendimento/abrir", icon: Plus },
+      { label: "Meus Chamados", href: "/atendimento/meus", icon: FileText },
+      { label: "Central de Chamados", href: "/atendimento/central", icon: LifeBuoy },
+      { label: "Fila de Atendimento", href: "/atendimento/fila", icon: ClipboardList },
+      { label: "Base de Conhecimento", href: "/atendimento/base", icon: PanelsTopLeft },
+      { label: "Relatorios", href: "/atendimento/relatorios", icon: FileBarChart },
+      { label: "Configuracoes", href: "/atendimento/configuracoes", icon: Settings }
     ]
   },
   {

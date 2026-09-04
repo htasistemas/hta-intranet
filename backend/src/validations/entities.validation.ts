@@ -267,6 +267,102 @@ export const systemMonitorSchema = z.object({
   active: z.boolean().default(true)
 });
 
+const supportTicketStatus = z.enum(["NEW", "TRIAGE", "IN_PROGRESS", "WAITING_USER", "DEVELOPMENT", "TESTING", "RESOLVED", "CLOSED", "REOPENED", "CANCELLED"]);
+const supportTicketPriority = z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]);
+const supportTicketSeverity = z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]);
+const supportTicketType = z.enum(["INCIDENT", "REQUEST", "IMPROVEMENT", "BUG", "QUESTION", "DEVELOPMENT"]);
+const optionalId = z.string().trim().min(1).nullable().optional();
+
+export const supportTicketAttachmentInputSchema = z.object({
+  name: z.string().trim().min(1).max(180),
+  mimeType: z.string().trim().min(1).max(120),
+  size: z.coerce.number().int().min(1).max(10 * 1024 * 1024),
+  contentBase64: z.string().trim().min(1)
+});
+
+export const supportTicketCreateSchema = z.object({
+  clientId: optionalId,
+  productId: optionalId,
+  requesterName: z.string().trim().min(2).max(120),
+  requesterEmail: z.string().trim().email(),
+  requesterPhone: optionalText,
+  unit: optionalText,
+  systemModule: z.string().trim().min(2).max(120),
+  category: z.string().trim().min(2).max(120),
+  type: supportTicketType,
+  priority: supportTicketPriority.default("MEDIUM"),
+  impact: supportTicketSeverity.default("MEDIUM"),
+  urgency: supportTicketSeverity.default("MEDIUM"),
+  subject: z.string().trim().min(5).max(180),
+  description: z.string().trim().min(10).max(8000),
+  currentActivity: optionalText,
+  happened: optionalText,
+  expectedResult: optionalText,
+  actualResult: optionalText,
+  reproductionSteps: optionalText,
+  attachments: z.array(supportTicketAttachmentInputSchema).max(5).default([])
+});
+
+export const supportTicketFilterSchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  search: z.string().trim().optional(),
+  scope: z.enum(["all", "mine", "unassigned"]).default("all"),
+  clientId: z.string().trim().optional(),
+  productId: z.string().trim().optional(),
+  requesterId: z.string().trim().optional(),
+  analystId: z.string().trim().optional(),
+  status: supportTicketStatus.optional(),
+  priority: supportTicketPriority.optional(),
+  category: z.string().trim().optional(),
+  systemModule: z.string().trim().optional(),
+  periodFrom: z.coerce.date().optional(),
+  periodTo: z.coerce.date().optional(),
+  sortBy: z.enum(["createdAt", "updatedAt", "protocol", "priority", "status", "dueAt"]).default("createdAt"),
+  order: z.enum(["asc", "desc"]).default("desc")
+});
+
+export const supportTicketMessageSchema = z.object({
+  body: z.string().trim().min(2).max(8000),
+  internal: z.boolean().default(false),
+  attachments: z.array(supportTicketAttachmentInputSchema).max(5).default([])
+});
+
+export const supportTicketStatusChangeSchema = z.object({
+  status: supportTicketStatus,
+  note: z.string().trim().min(2).max(8000).optional(),
+  analystId: optionalId,
+  priority: supportTicketPriority.optional(),
+  category: z.string().trim().min(2).max(120).optional(),
+  systemModule: z.string().trim().min(2).max(120).optional()
+});
+
+export const supportTicketAssignSchema = z.object({
+  analystId: z.string().trim().min(1).nullable().optional(),
+  note: z.string().trim().max(2000).optional()
+});
+
+export const supportTicketSlaRuleSchema = z.object({
+  name: z.string().trim().min(2).max(120),
+  priority: supportTicketPriority.nullable().optional(),
+  category: z.string().trim().max(120).nullable().optional(),
+  clientId: optionalId,
+  productId: optionalId,
+  type: supportTicketType.nullable().optional(),
+  responseMinutes: z.coerce.number().int().min(5).max(43200),
+  resolutionMinutes: z.coerce.number().int().min(15).max(129600),
+  active: z.boolean().default(true)
+});
+
+export const knowledgeBaseArticleSchema = z.object({
+  title: z.string().trim().min(3).max(180),
+  category: z.string().trim().min(2).max(120),
+  systemModule: optionalText,
+  productName: optionalText,
+  content: z.string().trim().min(10).max(20000),
+  published: z.boolean().default(true)
+});
+
 export const partnerSchema = z.object({
   name: z.string().trim().min(2).transform(normalizeTitleText),
   company: optionalTitleText(),

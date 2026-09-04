@@ -42,6 +42,9 @@ services:
       MAIL_PORT: ${MAIL_PORT:-587}
       MAIL_USER: ${MAIL_USER:-}
       MAIL_PASS: ${MAIL_PASS:-}
+      TICKET_STORAGE_DIR: /app/storage/tickets
+    volumes:
+      - hta_intranet_ticket_storage:/app/storage
     healthcheck:
       test: ["CMD", "node", "-e", "require(\x27http\x27).get(\x27http://localhost:3333/health\x27,res=>process.exit(res.statusCode===200?0:1)).on(\x27error\x27,()=>process.exit(1))"]
       interval: 10s
@@ -71,3 +74,4 @@ services:
 
 volumes:
   hta_intranet_postgres:
+  hta_intranet_ticket_storage:

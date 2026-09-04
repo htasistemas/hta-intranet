@@ -11,6 +11,7 @@ import { ProductController } from "../controllers/product.controller.js";
 import { PartnerController } from "../controllers/partner.controller.js";
 import { BackupController } from "../controllers/backup.controller.js";
 import { SystemMonitorController } from "../controllers/system-monitor.controller.js";
+import { SupportTicketController } from "../controllers/support-ticket.controller.js";
 import { asyncHandler } from "../utils/async-handler.js";
 import { validateBody } from "../middleware/validate.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -47,6 +48,12 @@ import {
   userAdminUpdateSchema,
   userCreateSchema,
   systemMonitorSchema,
+  knowledgeBaseArticleSchema,
+  supportTicketAssignSchema,
+  supportTicketCreateSchema,
+  supportTicketMessageSchema,
+  supportTicketSlaRuleSchema,
+  supportTicketStatusChangeSchema,
   userUpdateSchema
 } from "../validations/entities.validation.js";
 import { forgotPasswordSchema, googleLoginSchema, loginSchema, refreshSchema, resetPasswordSchema } from "../validations/auth.validation.js";
@@ -67,6 +74,7 @@ const products = new ProductController();
 const partners = new PartnerController();
 const backups = new BackupController();
 const systemMonitors = new SystemMonitorController();
+const supportTickets = new SupportTicketController();
 export const apiRouter = Router();
 
 const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false });
@@ -154,6 +162,20 @@ apiRouter.post("/system-monitors/:id/check", asyncHandler(systemMonitors.checkOn
 apiRouter.post("/system-monitors", validateBody(systemMonitorSchema), asyncHandler(systemMonitors.create));
 apiRouter.put("/system-monitors/:id", validateBody(systemMonitorSchema), asyncHandler(systemMonitors.update));
 apiRouter.delete("/system-monitors/:id", asyncHandler(systemMonitors.delete));
+apiRouter.get("/support-tickets/dashboard", asyncHandler(supportTickets.dashboard));
+apiRouter.get("/support-tickets", asyncHandler(supportTickets.list));
+apiRouter.post("/support-tickets", validateBody(supportTicketCreateSchema), asyncHandler(supportTickets.create));
+apiRouter.get("/support-tickets/articles", asyncHandler(supportTickets.listArticles));
+apiRouter.post("/support-tickets/articles", validateBody(knowledgeBaseArticleSchema), asyncHandler(supportTickets.createArticle));
+apiRouter.get("/support-tickets/sla-rules", asyncHandler(supportTickets.listSlaRules));
+apiRouter.post("/support-tickets/sla-rules", validateBody(supportTicketSlaRuleSchema), asyncHandler(supportTickets.createSlaRule));
+apiRouter.delete("/support-tickets/sla-rules/:id", asyncHandler(supportTickets.deleteSlaRule));
+apiRouter.get("/support-tickets/analysts", asyncHandler(supportTickets.listAnalysts));
+apiRouter.get("/support-tickets/attachments/:id", asyncHandler(supportTickets.downloadAttachment));
+apiRouter.get("/support-tickets/:id", asyncHandler(supportTickets.get));
+apiRouter.post("/support-tickets/:id/messages", validateBody(supportTicketMessageSchema), asyncHandler(supportTickets.reply));
+apiRouter.post("/support-tickets/:id/assign", validateBody(supportTicketAssignSchema), asyncHandler(supportTickets.assign));
+apiRouter.post("/support-tickets/:id/status", validateBody(supportTicketStatusChangeSchema), asyncHandler(supportTickets.changeStatus));
 apiRouter.get("/reports/clients.csv", asyncHandler(reports.clientsCsv));
 apiRouter.get("/reports/clients.pdf", asyncHandler(reports.clientsPdf));
 apiRouter.get("/crm/dashboard", asyncHandler(crm.dashboard));

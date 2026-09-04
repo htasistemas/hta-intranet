@@ -275,6 +275,50 @@ enum SystemMonitorStatus {
   DOWN
 }
 
+enum SupportTicketStatus {
+  NEW
+  TRIAGE
+  IN_PROGRESS
+  WAITING_USER
+  DEVELOPMENT
+  TESTING
+  RESOLVED
+  CLOSED
+  REOPENED
+  CANCELLED
+}
+
+enum SupportTicketImpact {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum SupportTicketUrgency {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum SupportTicketType {
+  INCIDENT
+  REQUEST
+  IMPROVEMENT
+  BUG
+  QUESTION
+  DEVELOPMENT
+}
+
+enum SupportTicketMessageKind {
+  MESSAGE
+  INTERNAL_NOTE
+  STATUS_CHANGE
+  ATTACHMENT
+  AUTOMATIC
+}
+
 model User {
   id                       String                        @id @default(cuid())
   name                     String
@@ -315,6 +359,13 @@ model User {
   products                 ProductService[]
   clientProducts           ClientProduct[]
   systemMonitors           SystemMonitor[]
+  requestedTickets         SupportTicket[]               @relation("TicketRequester")
+  assignedTickets          SupportTicket[]               @relation("TicketAnalyst")
+  ticketMessages           SupportTicketMessage[]
+  ticketAttachments        SupportTicketAttachment[]
+  ticketHistory            SupportTicketHistory[]
+  ticketSlaRules           SupportTicketSlaRule[]
+  knowledgeArticles        KnowledgeBaseArticle[]
   partners                 Partner[]                    @relation("PartnerOwner")
   partnerInteractions      PartnerInteraction[]
 
@@ -390,6 +441,7 @@ model Client {
   projects      Project[]
   projectLinks  ClientProject[]
   products      ClientProduct[]
+  supportTickets SupportTicket[]
 
   @@index([ownerId, status])
   @@index([ownerId, name])
@@ -599,6 +651,8 @@ model ProductService {
   updatedAt             DateTime        @updatedAt
   clientProducts        ClientProduct[]
   projects              Project[]
+  supportTickets        SupportTicket[]
+  ticketSlaRules        SupportTicketSlaRule[]
 
   @@unique([ownerId, code])
   @@index([ownerId, status])
@@ -653,6 +707,155 @@ model SystemMonitor {
   @@index([ownerId, active])
   @@index([ownerId, status])
   @@map("sistemas_monitorados")
+}
+
+model SupportTicket {
+  id               String              @id @default(cuid())
+  tenantId         String              @default("default")
+  ownerId          String
+  protocol         String              @unique
+  clientId         String?
+  client           Client?             @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  productId        String?
+  product          ProductService?     @relation(fields: [productId], references: [id], onDelete: SetNull)
+  requesterId      String
+  requester        User                @relation("TicketRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  analystId        String?
+  analyst          User?               @relation("TicketAnalyst", fields: [analystId], references: [id], onDelete: SetNull)
+  requesterName    String
+  requesterEmail   String
+  requesterPhone   String?
+  unit             String?
+  systemModule     String
+  category         String
+  type             SupportTicketType
+  priority         Priority            @default(MEDIUM)
+  impact           SupportTicketImpact @default(MEDIUM)
+  urgency          SupportTicketUrgency @default(MEDIUM)
+  status           SupportTicketStatus @default(NEW)
+  subject          String
+  description      String
+  currentActivity  String?
+  happened         String?
+  expectedResult   String?
+  actualResult     String?
+  reproductionSteps String?
+  solution         String?
+  resolutionNote   String?
+  firstResponseAt  DateTime?
+  resolvedAt       DateTime?
+  closedAt         DateTime?
+  reopenedAt       DateTime?
+  cancelledAt      DateTime?
+  dueAt            DateTime?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  messages         SupportTicketMessage[]
+  attachments      SupportTicketAttachment[]
+  history          SupportTicketHistory[]
+
+  @@index([tenantId, ownerId, status, createdAt])
+  @@index([requesterId, status])
+  @@index([analystId, status])
+  @@index([clientId, status])
+  @@index([productId, status])
+  @@index([priority, status])
+  @@map("chamados_tecnicos")
+}
+
+model SupportTicketMessage {
+  id        String                   @id @default(cuid())
+  ticketId  String
+  ticket    SupportTicket            @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User                     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  kind      SupportTicketMessageKind @default(MESSAGE)
+  body      String
+  status    SupportTicketStatus
+  internal  Boolean                  @default(false)
+  createdAt DateTime                 @default(now())
+  attachments SupportTicketAttachment[]
+
+  @@index([ticketId, createdAt])
+  @@index([authorId, createdAt])
+  @@map("chamados_mensagens")
+}
+
+model SupportTicketAttachment {
+  id        String                @id @default(cuid())
+  ticketId  String
+  ticket    SupportTicket         @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  messageId String?
+  message   SupportTicketMessage? @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  uploaderId String
+  uploader  User                  @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
+  name      String
+  mimeType  String
+  size      Int
+  storagePath String
+  previewable Boolean             @default(false)
+  createdAt DateTime              @default(now())
+
+  @@index([ticketId, createdAt])
+  @@index([messageId])
+  @@map("chamados_anexos")
+}
+
+model SupportTicketHistory {
+  id        String   @id @default(cuid())
+  ticketId  String
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action    String
+  fromValue String?
+  toValue   String?
+  details   Json?
+  createdAt DateTime @default(now())
+
+  @@index([ticketId, createdAt])
+  @@index([userId, createdAt])
+  @@map("chamados_historico")
+}
+
+model SupportTicketSlaRule {
+  id        String             @id @default(cuid())
+  ownerId   String
+  owner     User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name      String
+  priority  Priority?
+  category  String?
+  clientId  String?
+  productId String?
+  product   ProductService?    @relation(fields: [productId], references: [id], onDelete: SetNull)
+  type      SupportTicketType?
+  responseMinutes Int
+  resolutionMinutes Int
+  active    Boolean            @default(true)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  @@index([ownerId, active])
+  @@index([priority, category])
+  @@map("chamados_regras_sla")
+}
+
+model KnowledgeBaseArticle {
+  id        String   @id @default(cuid())
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  title     String
+  category  String
+  systemModule String?
+  productName String?
+  content   String
+  published Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId, published])
+  @@index([category])
+  @@map("base_conhecimento")
 }
 
 model ClientProject {

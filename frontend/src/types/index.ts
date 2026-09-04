@@ -13,6 +13,11 @@ export type PartnerStatus = "ACTIVE" | "INACTIVE" | "PROSPECTING" | "SUSPENDED";
 export type CommissionModel = "ONE_TIME" | "RECURRING" | "REVENUE_SHARE" | "PROJECT_BASED" | "HYBRID";
 export type PartnerInteractionType = "CALL" | "EMAIL" | "MEETING" | "WHATSAPP" | "NOTE" | "TRAINING" | "PROPOSAL" | "REVIEW";
 export type SystemMonitorStatus = "UNKNOWN" | "ACTIVE" | "DOWN";
+export type SupportTicketStatus = "NEW" | "TRIAGE" | "IN_PROGRESS" | "WAITING_USER" | "DEVELOPMENT" | "TESTING" | "RESOLVED" | "CLOSED" | "REOPENED" | "CANCELLED";
+export type SupportTicketImpact = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+export type SupportTicketUrgency = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+export type SupportTicketType = "INCIDENT" | "REQUEST" | "IMPROVEMENT" | "BUG" | "QUESTION" | "DEVELOPMENT";
+export type SupportTicketMessageKind = "MESSAGE" | "INTERNAL_NOTE" | "STATUS_CHANGE" | "ATTACHMENT" | "AUTOMATIC";
 
 export interface UserAccount {
   id: string;
@@ -258,6 +263,161 @@ export interface SystemMonitorCheckResult {
   monitor: SystemMonitor;
   previousStatus: SystemMonitorStatus;
   alert: boolean;
+}
+
+export interface SupportTicketAttachment {
+  id: string;
+  ticketId: string;
+  messageId: string | null;
+  uploaderId: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  storagePath: string;
+  previewable: boolean;
+  createdAt: string;
+}
+
+export interface SupportTicketMessage {
+  id: string;
+  ticketId: string;
+  authorId: string;
+  author: Pick<UserAccount, "id" | "name" | "email" | "role">;
+  kind: SupportTicketMessageKind;
+  body: string;
+  status: SupportTicketStatus;
+  internal: boolean;
+  createdAt: string;
+  attachments: SupportTicketAttachment[];
+}
+
+export interface SupportTicketHistory {
+  id: string;
+  ticketId: string;
+  userId: string;
+  user: Pick<UserAccount, "id" | "name" | "email" | "role">;
+  action: string;
+  fromValue: string | null;
+  toValue: string | null;
+  details: unknown;
+  createdAt: string;
+}
+
+export interface SupportTicket {
+  id: string;
+  tenantId: string;
+  ownerId: string;
+  protocol: string;
+  clientId: string | null;
+  client: Client | null;
+  productId: string | null;
+  product: ProductService | null;
+  requesterId: string;
+  requester: Pick<UserAccount, "id" | "name" | "email" | "role" | "partnerId">;
+  analystId: string | null;
+  analyst: Pick<UserAccount, "id" | "name" | "email" | "role" | "partnerId"> | null;
+  requesterName: string;
+  requesterEmail: string;
+  requesterPhone: string | null;
+  unit: string | null;
+  systemModule: string;
+  category: string;
+  type: SupportTicketType;
+  priority: Priority;
+  impact: SupportTicketImpact;
+  urgency: SupportTicketUrgency;
+  status: SupportTicketStatus;
+  subject: string;
+  description: string;
+  currentActivity: string | null;
+  happened: string | null;
+  expectedResult: string | null;
+  actualResult: string | null;
+  reproductionSteps: string | null;
+  solution: string | null;
+  resolutionNote: string | null;
+  firstResponseAt: string | null;
+  resolvedAt: string | null;
+  closedAt: string | null;
+  reopenedAt: string | null;
+  cancelledAt: string | null;
+  dueAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  messages: SupportTicketMessage[];
+  attachments: SupportTicketAttachment[];
+  history: SupportTicketHistory[];
+}
+
+export interface SupportTicketDashboard {
+  cards: {
+    total: number;
+    newTickets: number;
+    inProgress: number;
+    waitingUser: number;
+    development: number;
+    testing: number;
+    resolved: number;
+    closed: number;
+    reopened: number;
+    slaRisk: number;
+    slaExpired: number;
+  };
+  byClient: SupportTicketDashboardRow[];
+  bySystem: SupportTicketDashboardRow[];
+  byModule: SupportTicketDashboardRow[];
+  byRequester: SupportTicketDashboardRow[];
+  byAnalyst: SupportTicketDashboardRow[];
+  indicators: {
+    averageFirstResponseMinutes: number;
+    averageResolutionMinutes: number;
+    averageClosingMinutes: number;
+    resolutionPercent: number;
+    reopenPercent: number;
+    slaMetPercent: number;
+    slaExpiredPercent: number;
+  };
+}
+
+export interface SupportTicketDashboardRow {
+  label: string;
+  total: number;
+  newTickets: number;
+  inProgress: number;
+  resolved: number;
+  closed: number;
+  reopened: number;
+  development: number;
+  testing: number;
+}
+
+export interface SupportTicketSlaRule {
+  id: string;
+  ownerId: string;
+  name: string;
+  priority: Priority | null;
+  category: string | null;
+  clientId: string | null;
+  productId: string | null;
+  type: SupportTicketType | null;
+  responseMinutes: number;
+  resolutionMinutes: number;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface KnowledgeBaseArticle {
+  id: string;
+  ownerId: string;
+  title: string;
+  category: string;
+  systemModule: string | null;
+  productName: string | null;
+  content: string;
+  published: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface DashboardData {
