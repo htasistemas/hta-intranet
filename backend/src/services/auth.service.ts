@@ -33,10 +33,19 @@ function smtpConfigured(): boolean {
   return Boolean(env.APP_EMAIL_HABILITADO && env.MAIL_HOST && env.MAIL_PORT && env.MAIL_USER && env.MAIL_PASS && env.APP_EMAIL_REMETENTE);
 }
 
-async function sendPasswordResetEmail(input: { email: string; name: string; link: string; token: string }): Promise<void> {
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>'\"]/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "'": "&#39;",
+    "\"": "&quot;"
+  })[character] ?? character);
+}
+
+async function sendPasswordResetEmail(input: { email: string; name: string; link: string }): Promise<void> {
   if (!smtpConfigured()) {
-    console.info(`Token de redefinicao para ${input.email}: ${input.token}`);
-    return;
+    throw new ApiError(503, "Recuperacao de senha indisponivel: SMTP nao configurado.");
   }
   const host = env.MAIL_HOST;
   const port = env.MAIL_PORT;
@@ -44,14 +53,30 @@ async function sendPasswordResetEmail(input: { email: string; name: string; link
   const pass = env.MAIL_PASS;
   const fromAddress = env.APP_EMAIL_REMETENTE;
   if (!host || !port || !user || !pass || !fromAddress) throw new ApiError(500, "Servidor de e-mail SMTP incompleto.");
-  const transporter = nodemailer.createTransport({ host, port, secure: port === 465, auth: { user, pass } });
-  await transporter.sendMail({
-    from: { address: fromAddress, name: env.APP_EMAIL_NOME ?? fromAddress },
-    to: { address: input.email, name: input.name },
-    subject: "Redefinicao de senha - Torresoft",
-    text: `Use este link para redefinir sua senha: ${input.link}`,
-    html: `<p>Ola ${input.name},</p><p>Use o link abaixo para redefinir sua senha:</p><p><a href="${input.link}">${input.link}</a></p><p>Este link expira em 1 hora.</p>`
+  const transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: { user, pass },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000
   });
+  const safeName = escapeHtml(input.name);
+  const safeLink = escapeHtml(input.link);
+  try {
+    await transporter.sendMail({
+      from: { address: fromAddress, name: env.APP_EMAIL_NOME ?? fromAddress },
+      to: { address: input.email, name: input.name },
+      subject: "Redefinicao de senha - Torresoft",
+      text: `Use este link para redefinir sua senha: ${input.link}`,
+      html: `<p>Ola ${safeName},</p><p>Use o link abaixo para redefinir sua senha:</p><p><a href="${safeLink}">Redefinir minha senha</a></p><p>Este link expira em 1 hora.</p>`
+    });
+  } catch {
+    throw new ApiError(502, "Nao foi possivel enviar o e-mail de redefinicao.");
+  } finally {
+    transporter.close();
+  }
 }
 
 export class AuthService {
@@ -107,11 +132,16 @@ export class AuthService {
     if (!user) return { sent: true };
     await prisma.passwordResetToken.updateMany({ where: { userId: user.id, usedAt: null }, data: { usedAt: new Date() } });
     const token = randomBytes(32).toString("hex");
-    await prisma.passwordResetToken.create({
+    const resetRecord = await prisma.passwordResetToken.create({
       data: { userId: user.id, tokenHash: hashToken(token), expiresAt: addHours(new Date(), 1) }
     });
     const link = `${env.FRONTEND_URL}/login?resetToken=${encodeURIComponent(token)}`;
-    await sendPasswordResetEmail({ email: user.email, name: user.name, link, token });
+    try {
+      await sendPasswordResetEmail({ email: user.email, name: user.name, link });
+    } catch (error) {
+      await prisma.passwordResetToken.update({ where: { id: resetRecord.id }, data: { usedAt: new Date() } });
+      throw error;
+    }
     return { sent: true };
   }
 

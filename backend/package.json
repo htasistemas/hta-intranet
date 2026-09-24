@@ -10,7 +10,8 @@
     "lint": "tsc --noEmit",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:seed": "prisma db seed"
+    "prisma:seed": "prisma db seed",
+    "create:master-user": "tsx scripts/create-master-user.ts"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",

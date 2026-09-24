@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, EyeOff, KeyRound, Mail, ShieldCheck, Sparkles } from "lucide-react";
+import { Eye, EyeOff, KeyRound, Mail, ShieldCheck } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { Navigate, useSearchParams } from "react-router-dom";
 import { z } from "zod";
@@ -124,8 +124,10 @@ export default function LoginPage() {
       <Card className="relative z-10 grid w-full max-w-5xl overflow-hidden p-0 lg:grid-cols-2">
         <div className="p-8">
           <div className="mb-8 flex items-center gap-3">
-            <span className="gradient-fill grid h-12 w-12 place-items-center rounded-2xl"><Sparkles /></span>
-            <div><h1 className="text-xl font-bold"><span className="gradient-text">Torresoft</span></h1><p className="text-sm text-slate-400">Entre na sua central de gestao</p></div>
+            <div>
+              <h1 className="text-xl font-bold"><span className="gradient-text">Torresoft</span></h1>
+              <p className="text-sm text-slate-400">Entre na sua central de gestao</p>
+            </div>
           </div>
 
           {mode === "login" ? (
@@ -175,7 +177,10 @@ export default function LoginPage() {
             </form>
           ) : null}
         </div>
-        <img className="hidden h-full min-h-[560px] w-full object-cover object-center opacity-90 lg:block" src="/assets/login-hero.png" alt="" aria-hidden="true" />
+        <div className="relative hidden min-h-[560px] overflow-hidden lg:block">
+          <img className="h-full min-h-[560px] w-full object-cover object-center opacity-90" src="/assets/login-hero.png" alt="" aria-hidden="true" />
+          <img className="absolute left-8 top-8 h-24 w-auto object-contain" src="/assets/logo-torresoft-transparent.png" alt="Torresoft" />
+        </div>
       </Card>
     </div>
   );
