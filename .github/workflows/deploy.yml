@@ -24,8 +24,11 @@ jobs:
     steps:
       - name: Atualizar checkout de producao
         working-directory: /home/srv/hta-intranet
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/htasistemas/hta-intranet.git"
           git fetch origin master
           git checkout master
           git reset --hard origin/master
