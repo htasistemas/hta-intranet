@@ -23,6 +23,7 @@ import {
   Plus,
   Search,
   Settings,
+  UserRoundPlus,
   Sparkles,
   LayoutDashboard,
   LifeBuoy,
@@ -74,6 +75,7 @@ const navigation: NavigationGroup[] = [
       { label: "Agenda Profissional", href: "/agenda", icon: CalendarDays },
       { label: "Gestao Pessoal", href: "/tarefas", icon: ClipboardList },
       { label: "CRM Comercial", href: "/crm-comercial", icon: Handshake },
+      { label: "Possiveis clientes", href: "/possiveis-clientes", icon: UserRoundPlus },
       { label: "Portal Cliente", href: "/portal-cliente", icon: PanelsTopLeft },
       { label: "Monitoramento", href: "/monitoramento", icon: MonitorCheck },
       { label: "Relatorios", href: "/relatorios", icon: FileBarChart }

@@ -5,7 +5,7 @@ import { HandCoins, Handshake, MessageSquarePlus, Plus, Search, Target, Trash2, 
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { api } from "@/services/api";
-import type { CommissionModel, PageResult, Partner, PartnerInteractionType, PartnerStatus, PartnerType, Project } from "@/types";
+import type { CommissionModel, PageResult, Partner, PartnerCommissionStatus, PartnerInteractionType, PartnerStatus, PartnerType, Project } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -79,6 +79,13 @@ const commissionLabels: Record<CommissionModel, string> = {
   REVENUE_SHARE: "Divisao de receita",
   PROJECT_BASED: "Por projeto",
   HYBRID: "Hibrido"
+};
+
+const commissionStatusLabels: Record<PartnerCommissionStatus, string> = {
+  PENDING: "Pendente",
+  APPROVED: "Aprovada",
+  PAID: "Paga",
+  CANCELED: "Cancelada"
 };
 
 const interactionLabels: Record<PartnerInteractionType, string> = {
@@ -161,6 +168,11 @@ function projectedCommission(partner: Partner): number {
   const percent = Number(partner.commissionPercent ?? 0);
   const linkedBudget = partner.projectLinks?.reduce((total, link) => total + monetaryValue(link.project.budget), 0) ?? 0;
   return (linkedBudget * percent / 100) + monetaryValue(partner.fixedAmount) + monetaryValue(partner.closeBonus);
+}
+
+function linkCommission(partner: Partner, link: NonNullable<Partner["projectLinks"]>[number]): number {
+  if (link.commissionAmount !== null && link.commissionAmount !== undefined) return monetaryValue(link.commissionAmount);
+  return monetaryValue(link.project.budget) * Number(partner.commissionPercent ?? 0) / 100 + monetaryValue(partner.fixedAmount) + monetaryValue(partner.closeBonus);
 }
 
 function PartnerFormDialog({ open, partner, projects, onClose, onSave }: { open: boolean; partner?: Partner; projects: Project[]; onClose: () => void; onSave: (input: Record<string, unknown>) => Promise<void> }) {
@@ -318,13 +330,29 @@ export default function PartnersPage() {
     onError: (error) => toast(error.message, "error")
   });
 
+  const updateCommission = useMutation({
+    mutationFn: ({ partnerId, projectId, status }: { partnerId: string; projectId: string; status: PartnerCommissionStatus }) => api.put(`/partners/${partnerId}/projects/${projectId}/commission`, { status }),
+    onSuccess: () => { invalidate(); toast("Comissao atualizada."); },
+    onError: (error) => toast(error.message, "error")
+  });
+
+  const commissionTotals = useMemo(() => partnerList.reduce((totals, partner) => {
+    for (const link of partner.projectLinks ?? []) {
+      const amount = linkCommission(partner, link);
+      if (link.commissionStatus === "PAID") totals.paid += amount;
+      else if (link.commissionStatus !== "CANCELED") totals.pending += amount;
+    }
+    return totals;
+  }, { pending: 0, paid: 0 }), [partnerList]);
+
   return (
     <div className="space-y-5">
       <section className="grid gap-4 md:grid-cols-4">
         <Card><p className="text-sm text-slate-400">{isPartnerUser ? "Minha parceria" : "Parceiros"}</p><strong className="mt-2 block text-3xl">{stats.total}</strong></Card>
         <Card><p className="text-sm text-slate-400">Clientes vinculados</p><strong className="mt-2 block text-3xl">{stats.clients}</strong></Card>
         <Card><p className="text-sm text-slate-400">Vendas/projetos</p><strong className="mt-2 block text-3xl">{stats.projects}</strong></Card>
-        <Card><p className="text-sm text-slate-400">Comissao projetada</p><strong className="mt-2 block text-3xl">{currency(stats.commission)}</strong></Card>
+        <Card><p className="text-sm text-slate-400">Comissao pendente</p><strong className="mt-2 block text-3xl">{currency(commissionTotals.pending)}</strong></Card>
+        <Card><p className="text-sm text-slate-400">Comissao paga</p><strong className="mt-2 block text-3xl text-emerald-300">{currency(commissionTotals.paid)}</strong></Card>
       </section>
 
       <Card>
@@ -406,8 +434,9 @@ export default function PartnersPage() {
                         <p className="font-medium">{link.project.code} - {link.project.name}</p>
                         <p className="mt-1 text-xs text-slate-400">{link.project.client?.name ?? "Cliente nao informado"} {link.project.product ? `- ${link.project.product.name}` : ""}</p>
                       </div>
-                      <span className="text-xs text-accent">{currency(monetaryValue(link.project.budget))}</span>
+                      <span className="text-right text-xs text-accent">{currency(linkCommission(selected, link))}<br /><span className={link.commissionStatus === "PAID" ? "text-emerald-300" : "text-amber-300"}>{commissionStatusLabels[link.commissionStatus ?? "PENDING"]}</span></span>
                     </div>
+                    {!isPartnerUser ? <div className="mt-3 flex gap-2"><Button variant="outline" size="sm" disabled={updateCommission.isPending || link.commissionStatus === "PAID"} onClick={() => updateCommission.mutate({ partnerId: selected.id, projectId: link.project.id, status: "PAID" })}>Marcar paga</Button><Button variant="outline" size="sm" disabled={updateCommission.isPending || link.commissionStatus === "APPROVED"} onClick={() => updateCommission.mutate({ partnerId: selected.id, projectId: link.project.id, status: "APPROVED" })}>Aprovar</Button></div> : null}
                   </article>
                 ))}
                 {(!selected.projectLinks || selected.projectLinks.length === 0) ? <p className="text-sm text-slate-400">Nenhum projeto/venda vinculado ainda.</p> : null}

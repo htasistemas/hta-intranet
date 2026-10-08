@@ -11,6 +11,7 @@ export type ClientCommunicationChannel = "EMAIL" | "WHATSAPP";
 export type PartnerType = "REFERRAL" | "RESELLER" | "IMPLEMENTATION" | "STRATEGIC" | "AFFILIATE";
 export type PartnerStatus = "ACTIVE" | "INACTIVE" | "PROSPECTING" | "SUSPENDED";
 export type CommissionModel = "ONE_TIME" | "RECURRING" | "REVENUE_SHARE" | "PROJECT_BASED" | "HYBRID";
+export type PartnerCommissionStatus = "PENDING" | "APPROVED" | "PAID" | "CANCELED";
 export type PartnerInteractionType = "CALL" | "EMAIL" | "MEETING" | "WHATSAPP" | "NOTE" | "TRAINING" | "PROPOSAL" | "REVIEW";
 export type SystemMonitorStatus = "UNKNOWN" | "ACTIVE" | "DOWN";
 export type SupportTicketStatus = "NEW" | "TRIAGE" | "IN_PROGRESS" | "WAITING_USER" | "DEVELOPMENT" | "TESTING" | "RESOLVED" | "CLOSED" | "REOPENED" | "CANCELLED";
@@ -208,7 +209,7 @@ export interface Partner {
   notes: string | null;
   createdAt: string;
   updatedAt: string;
-  projectLinks?: Array<{ project: Project }>;
+  projectLinks?: Array<{ project: Project; commissionAmount?: string | number | null; commissionStatus?: PartnerCommissionStatus; dueDate?: string | null; paidAt?: string | null }>;
   interactions?: PartnerInteraction[];
   users?: Array<{ id: string; name: string; email: string; role: UserRole }>;
   _count?: { projectLinks: number; interactions: number; users?: number };

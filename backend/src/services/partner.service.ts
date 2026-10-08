@@ -1,12 +1,13 @@
 import type { z } from "zod";
 import { PartnerRepository } from "../repositories/partner.repository.js";
 import { AuditRepository } from "../repositories/audit.repository.js";
-import type { partnerInteractionSchema, partnerSchema } from "../validations/entities.validation.js";
+import type { partnerCommissionSchema, partnerInteractionSchema, partnerSchema } from "../validations/entities.validation.js";
 import type { ListQuery } from "../utils/pagination.js";
 import { ApiError } from "../utils/api-error.js";
 
 type PartnerInput = z.infer<typeof partnerSchema>;
 type PartnerInteractionInput = z.infer<typeof partnerInteractionSchema>;
+type PartnerCommissionInput = z.infer<typeof partnerCommissionSchema>;
 
 export class PartnerService {
   public constructor(
@@ -65,5 +66,18 @@ export class PartnerService {
     });
     await this.auditRepository.log({ userId, entity: "PartnerInteraction", entityId: interaction.id, action: "CREATED" });
     return interaction;
+  }
+
+  public async updateCommission(partnerId: string, projectId: string, input: PartnerCommissionInput, userId: string) {
+    await this.get(partnerId, userId);
+    const paidAt = input.status === "PAID" ? input.paidAt ?? new Date() : null;
+    const commission = await this.repository.updateCommission(partnerId, projectId, {
+      commissionAmount: input.amount,
+      commissionStatus: input.status,
+      dueDate: input.dueDate,
+      paidAt
+    });
+    await this.auditRepository.log({ userId, entity: "PartnerProject", entityId: `${partnerId}:${projectId}`, action: "UPDATED", changes: { commissionStatus: input.status } });
+    return commission;
   }
 }

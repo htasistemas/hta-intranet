@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Building2, Download, FileText, Handshake, KanbanSquare, LayoutDashboard, ListFilter, Mail, Plus, Search, Settings2, UserRoundCheck, UserRoundPlus } from "lucide-react";
+import { Building2, CheckCircle2, Clock3, Download, FileText, Handshake, KanbanSquare, LayoutDashboard, ListFilter, Mail, MessageCircle, Plus, Search, Settings2, UserRoundCheck, UserRoundPlus } from "lucide-react";
 import { api } from "@/services/api";
 import type { Client, PageResult, Priority } from "@/types";
 import type { CrmActivity, CrmAutomation, CrmClient, CrmClientIntelligence, CrmDashboard, CrmLead, CrmLeadScore, CrmPipelineStage, CrmProject, CrmProjectStatus, CrmProposal } from "@/types/crm";
@@ -17,11 +17,12 @@ import { ActivityForm, AutomationForm, AutomationList, CompactActivityList, Lead
 import { CrmPipelineKanban, CrmProjectKanban, pipelineColumns } from "@/components/crm/crm-kanban";
 import { CommunicationPanel } from "@/components/crm/communication-panel";
 
-type CrmTab = "dashboard" | "leads" | "pipeline" | "timeline" | "proposals" | "projects" | "portal" | "communication" | "automations" | "reports";
+type CrmTab = "dashboard" | "possible" | "leads" | "pipeline" | "timeline" | "proposals" | "projects" | "portal" | "communication" | "automations" | "reports";
 type CrmLocationState = { crmTab?: CrmTab };
 
 const tabs: Array<{ id: CrmTab; label: string; icon: typeof LayoutDashboard }> = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { id: "possible", label: "Possiveis clientes", icon: UserRoundPlus },
   { id: "leads", label: "Leads", icon: UserRoundCheck },
   { id: "pipeline", label: "Funil", icon: KanbanSquare },
   { id: "timeline", label: "Timeline", icon: ListFilter },
@@ -140,6 +141,7 @@ export default function CrmPage() {
   const [selectedLead, setSelectedLead] = useState<CrmLead | undefined>();
   const [leadDraft, setLeadDraft] = useState<CrmLead | undefined>();
   const [selectedClientId, setSelectedClientId] = useState<string>("");
+  const [communicationLeadId, setCommunicationLeadId] = useState<string | undefined>();
   const queryClient = useQueryClient();
   const location = useLocation();
   const { toast } = useToast();
@@ -221,8 +223,9 @@ export default function CrmPage() {
 
   useEffect(() => {
     const state = location.state as CrmLocationState | null;
-    if (state?.crmTab) setTab(state.crmTab);
-  }, [location.state]);
+    if (location.pathname === "/possiveis-clientes") setTab("possible");
+    else if (state?.crmTab) setTab(state.crmTab);
+  }, [location.pathname, location.state]);
 
   const moveLead = useMutation({
     mutationFn: ({ lead, stage }: { lead: CrmLead; stage: CrmPipelineStage }) => api.put<CrmLead>(`/crm/leads/${lead.id}/stage`, { stage }),
@@ -259,6 +262,14 @@ export default function CrmPage() {
     onSuccess: () => { refreshAll(); toast("Automacao salva."); },
     onError: (error) => toast(error.message, "error")
   });
+
+  const activateClient = useMutation({
+    mutationFn: (leadId: string) => api.post(`/crm/leads/${leadId}/activate-client`, {}),
+    onSuccess: () => { refreshAll(); toast("Cliente ativado com sucesso."); },
+    onError: (error) => toast(error.message, "error")
+  });
+
+  const hasContactHistory = (lead: CrmLead): boolean => (lead.activities ?? []).some((activity) => ["CALL", "EMAIL", "WHATSAPP", "MEETING", "VISIT", "FOLLOW_UP", "DEMONSTRATION"].includes(activity.type)) || Boolean(lead.messages?.length);
 
   function renderDashboard() {
     if (dashboard.isLoading || !dashboard.data) return <div className="grid gap-4 md:grid-cols-4">{Array.from({ length: 8 }, (_, index) => <Skeleton key={index} className="h-32" />)}</div>;
@@ -345,6 +356,36 @@ export default function CrmPage() {
             <CrmPipelineKanban leads={leads} onMove={(lead, stage) => moveLead.mutate({ lead, stage })} onOpenLead={(lead) => { setSelectedLead(lead); setLeadDialogOpen(true); }} />
           </section>
         )}
+      </div>
+    );
+  }
+
+  function renderPossibleClients() {
+    const possibleLeads = leads.filter((lead) => lead.status !== "LOST");
+    const contacted = possibleLeads.filter(hasContactHistory);
+    const readyToClose = possibleLeads.filter((lead) => hasContactHistory(lead) && ["QUALIFIED", "PROPOSAL_SENT", "NEGOTIATION"].includes(lead.status));
+    return (
+      <div className="space-y-5">
+        <section className="grid gap-4 md:grid-cols-3">
+          <Card><p className="text-sm text-slate-400">Na carteira</p><p className="mt-2 text-3xl font-semibold">{possibleLeads.length}</p><p className="mt-1 text-xs text-slate-500">Captacoes ainda nao convertidas</p></Card>
+          <Card><p className="text-sm text-slate-400">Com contato</p><p className="mt-2 text-3xl font-semibold text-sky-300">{contacted.length}</p><p className="mt-1 text-xs text-slate-500">Historico registrado no CRM</p></Card>
+          <Card><p className="text-sm text-slate-400">Prontos para fechamento</p><p className="mt-2 text-3xl font-semibold text-emerald-300">{readyToClose.length}</p><p className="mt-1 text-xs text-slate-500">Qualificados, proposta ou negociacao</p></Card>
+        </section>
+        <Card>
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between"><div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Esteira comercial</p><h2 className="mt-1 text-lg font-semibold">Possiveis clientes</h2></div><p className="text-sm text-slate-400">O cliente so sai desta tela quando a venda for confirmada.</p></div>
+          <div className="mt-5 grid gap-4 lg:grid-cols-2">
+            {possibleLeads.map((lead) => {
+              const contactedLead = hasContactHistory(lead);
+              return <article key={lead.id} className="rounded-2xl border border-slate-700 bg-sidebar p-4">
+                <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h3 className="truncate font-semibold text-slate-100">{lead.name}</h3><p className="mt-1 truncate text-sm text-slate-400">{lead.company ?? lead.email ?? "Sem empresa"}</p></div><span className="rounded-full bg-accent/10 px-2 py-1 text-xs text-accent">{pipelineTitle(lead.stage)}</span></div>
+                <div className="mt-4 grid gap-2 text-sm sm:grid-cols-3"><span className="text-slate-400">Valor<br /><strong className="text-slate-100">{currency(Number(lead.estimatedValue ?? 0))}</strong></span><span className="text-slate-400">Ultimo contato<br /><strong className="text-slate-100">{lead.lastInteractionAt ? new Intl.DateTimeFormat("pt-BR").format(new Date(lead.lastInteractionAt)) : "Ainda nao"}</strong></span><span className="text-slate-400">Responsavel<br /><strong className="text-slate-100">{lead.responsible || "Nao definido"}</strong></span></div>
+                <div className="mt-4 flex flex-wrap items-center gap-2"><span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs ${contactedLead ? "bg-sky-500/15 text-sky-200" : "bg-amber-500/15 text-amber-200"}`}>{contactedLead ? <CheckCircle2 size={13} /> : <Clock3 size={13} />}{contactedLead ? "Contato registrado" : "Aguardando contato"}</span><Button variant="outline" size="sm" onClick={() => { setSelectedLead(lead); setLeadDialogOpen(true); }}>Abrir ficha</Button><Button variant="outline" size="sm" onClick={() => { setCommunicationLeadId(lead.id); setTab("communication"); }}><MessageCircle size={14} /> Mensagem</Button>{contactedLead ? <Button size="sm" disabled={activateClient.isPending} onClick={() => activateClient.mutate(lead.id)}><CheckCircle2 size={14} /> Ativar cliente</Button> : <span className="text-xs text-slate-500">Registre uma ligacao, reuniao ou mensagem para habilitar a ativacao.</span>}</div>
+                <div className="mt-3 border-t border-slate-800 pt-3">{(lead.activities ?? []).slice(0, 3).map((activity) => <p key={activity.id} className="truncate text-xs text-slate-400">{new Intl.DateTimeFormat("pt-BR").format(new Date(activity.createdAt))} · {activity.title}</p>)}{!(lead.activities ?? []).length ? <p className="text-xs text-slate-500">Sem historico de contato.</p> : null}</div>
+              </article>;
+            })}
+            {!possibleLeads.length ? <p className="rounded-xl border border-slate-700 p-5 text-sm text-slate-400 lg:col-span-2">Nenhum possivel cliente na carteira.</p> : null}
+          </div>
+        </Card>
       </div>
     );
   }
@@ -445,13 +486,14 @@ export default function CrmPage() {
     <div className="space-y-5">
       <section className="flex flex-wrap gap-2">{tabs.map(({ id, label, icon: Icon }) => <button key={id} type="button" onClick={() => setTab(id)} className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition ${tabButtonClass(tab === id)}`}><Icon size={16} /> {label}</button>)}</section>
       {tab === "dashboard" && renderDashboard()}
+      {tab === "possible" && renderPossibleClients()}
       {tab === "leads" && renderLeads()}
       {tab === "pipeline" && (leadsQuery.isLoading ? <Skeleton className="h-96" /> : <CrmPipelineKanban leads={leads} onMove={(lead, stage) => moveLead.mutate({ lead, stage })} />)}
       {tab === "timeline" && <div className="space-y-4"><Card><CardTitle>Nova atividade</CardTitle><ActivityForm onSave={(input) => saveActivity.mutateAsync(input).then(() => undefined)} /></Card><Card><CardTitle>Historico completo</CardTitle><CompactActivityList activities={activities} /></Card></div>}
       {tab === "proposals" && <div className="space-y-4"><Card><CardTitle>Nova proposta</CardTitle><ProposalForm leads={leads} clients={clients} onSave={(input) => saveProposal.mutateAsync(input).then(() => undefined)} /></Card><Card><CardTitle>Propostas comerciais</CardTitle><ProposalList proposals={proposals} /></Card></div>}
       {tab === "projects" && <div className="space-y-4"><Card><CardTitle>Novo projeto</CardTitle><ProjectForm clients={clients} onSave={(input) => saveProject.mutateAsync(input).then(() => undefined)} /></Card>{projectsQuery.isLoading ? <Skeleton className="h-96" /> : <CrmProjectKanban projects={projects} onMove={(project, status) => moveProject.mutate({ project, status })} />}</div>}
       {tab === "portal" && renderPortal()}
-      {tab === "communication" && <CommunicationPanel leads={leads} clients={clients} />}
+      {tab === "communication" && <CommunicationPanel leads={leads} clients={clients} initialLeadId={communicationLeadId} />}
       {tab === "automations" && <div className="space-y-4"><Card><CardTitle>Automacao configuravel</CardTitle><AutomationForm onSave={(input) => saveAutomation.mutateAsync(input).then(() => undefined)} /></Card><Card><CardTitle>Regras ativas</CardTitle><AutomationList automations={automations} /></Card></div>}
       {tab === "reports" && <Card><CardTitle>Relatorios</CardTitle><div className="grid gap-3 md:grid-cols-3"><Button variant="outline" onClick={() => void api.download("/crm/reports.csv", "crm-comercial.csv")}><Download size={16} /> Pipeline comercial CSV</Button><Button variant="outline" onClick={() => void api.download("/crm/reports.pdf", "crm-comercial.pdf")}><Download size={16} /> Receita PDF</Button><Button variant="outline" onClick={() => void api.download("/crm/reports.xls", "crm-comercial.xls")}><Download size={16} /> Produtividade Excel</Button></div><pre className="mt-4 max-h-96 overflow-auto rounded-xl bg-sidebar p-4 text-xs text-slate-300">{JSON.stringify(dashboard.data ?? {}, null, 2)}</pre></Card>}
       {renderLeadSourceDialog()}

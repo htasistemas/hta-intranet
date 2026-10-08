@@ -1,5 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { Send, Settings2, Target, Zap } from "lucide-react";
@@ -111,7 +112,7 @@ function campaignPayload(input: CampaignInput) {
   return { ...rest, filters: { segment, city, state }, scheduledAt: null };
 }
 
-export function CommunicationPanel({ leads, clients }: { leads: CrmLead[]; clients: CrmClient[] }) {
+export function CommunicationPanel({ leads, clients, initialLeadId }: { leads: CrmLead[]; clients: CrmClient[]; initialLeadId?: string }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const providers = useQuery({ queryKey: ["communication-provider-configs"], queryFn: () => api.get<CommunicationProviderConfig[]>("/communication/provider-configs") });
@@ -147,6 +148,17 @@ export function CommunicationPanel({ leads, clients }: { leads: CrmLead[]; clien
   const calculateScores = useMutation({ mutationFn: () => api.post("/crm/scores/calculate", {}), onSuccess: () => { invalidate(); toast("Scores recalculados."); }, onError: (error) => toast(error.message, "error") });
   const saveGoal = useMutation({ mutationFn: (input: GoalInput) => api.post("/crm/goals", { ...input, periodStart: new Date(input.periodStart).toISOString(), periodEnd: new Date(input.periodEnd).toISOString() }), onSuccess: () => { goalForm.reset(); invalidate(); toast("Meta salva."); }, onError: (error) => toast(error.message, "error") });
   const saveSla = useMutation({ mutationFn: (input: SlaInput) => api.post("/crm/sla-rules", input), onSuccess: () => { slaForm.reset(); invalidate(); toast("SLA salvo."); }, onError: (error) => toast(error.message, "error") });
+
+  useEffect(() => {
+    if (!initialLeadId) return;
+    const lead = leads.find((item) => item.id === initialLeadId);
+    if (!lead) return;
+    sendForm.setValue("leadId", lead.id);
+    sendForm.setValue("recipientName", lead.name);
+    sendForm.setValue("recipient", lead.email ?? lead.whatsapp ?? lead.phone ?? "");
+    sendForm.setValue("channel", lead.whatsapp ? "WHATSAPP" : "EMAIL");
+    sendForm.setValue("body", `Ola ${lead.name}, tudo bem? Gostaria de dar continuidade ao nosso atendimento e entender os proximos passos.`);
+  }, [initialLeadId, leads, sendForm]);
 
   return (
     <div className="space-y-5">

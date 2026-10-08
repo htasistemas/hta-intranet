@@ -39,6 +39,7 @@ import {
   crmSlaRuleSchema,
   noteSchema,
   partnerInteractionSchema,
+  partnerCommissionSchema,
   partnerSchema,
   clientProductSchema,
   productServiceSchema,
@@ -126,6 +127,7 @@ apiRouter.post("/partners", validateBody(partnerSchema), asyncHandler(partners.c
 apiRouter.put("/partners/:id", validateBody(partnerSchema), asyncHandler(partners.update));
 apiRouter.delete("/partners/:id", asyncHandler(partners.delete));
 apiRouter.post("/partners/:id/interactions", validateBody(partnerInteractionSchema), asyncHandler(partners.createInteraction));
+apiRouter.put("/partners/:id/projects/:projectId/commission", validateBody(partnerCommissionSchema), asyncHandler(partners.updateCommission));
 apiRouter.get("/projects", asyncHandler(projects.list));
 apiRouter.get("/projects/:id", asyncHandler(projects.get));
 apiRouter.post("/projects", validateBody(projectSchema), asyncHandler(projects.create));

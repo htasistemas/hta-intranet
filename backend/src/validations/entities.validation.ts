@@ -403,6 +403,13 @@ export const partnerInteractionSchema = z.object({
   nextStep: optionalText
 });
 
+export const partnerCommissionSchema = z.object({
+  amount: z.coerce.number().nonnegative().optional().nullable(),
+  status: z.enum(["PENDING", "APPROVED", "PAID", "CANCELED"]),
+  dueDate: z.coerce.date().optional().nullable(),
+  paidAt: z.coerce.date().optional().nullable()
+});
+
 export const crmLeadSchema = z.object({
   name: z.string().trim().min(2),
   company: optionalText,

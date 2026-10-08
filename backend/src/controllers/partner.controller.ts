@@ -50,4 +50,11 @@ export class PartnerController {
   public createInteraction = async (request: Request, response: Response): Promise<void> => {
     response.status(201).json(await this.service.createInteraction(resourceId(request), request.body, userId(request)));
   };
+
+  public updateCommission = async (request: Request, response: Response): Promise<void> => {
+    ensureCanManagePartners(request);
+    const partnerId = resourceId(request);
+    const projectId = z.string().parse(request.params.projectId);
+    response.json(await this.service.updateCommission(partnerId, projectId, request.body, userId(request)));
+  };
 }

@@ -285,6 +285,7 @@ export class CrmService {
   public async moveLeadStage(id: string, ownerId: string, stage: CrmPipelineStage) {
     const lead = await this.getLead(id, ownerId);
     const status = stageStatusMap[stage];
+    if (stage === "SALE_COMPLETED") await this.ensureLeadWasContacted(id, ownerId);
     const updated = await this.repository.updateLead(id, {
       stage,
       status,
@@ -609,6 +610,7 @@ export class CrmService {
   public async convertLead(id: string, ownerId: string) {
     const lead = await this.getLead(id, ownerId);
     if (lead.clientId) return lead.client;
+    await this.ensureLeadWasContacted(id, ownerId);
     const currentScope = scope(ownerId);
     return this.repository.transaction(async (tx) => {
       const client = await tx.crmClient.create({
@@ -678,6 +680,16 @@ export class CrmService {
       });
       return client;
     });
+  }
+
+  private async ensureLeadWasContacted(id: string, ownerId: string): Promise<void> {
+    const currentScope = scope(ownerId);
+    const contactTypes: CrmActivityType[] = ["CALL", "EMAIL", "WHATSAPP", "MEETING", "VISIT", "FOLLOW_UP", "DEMONSTRATION"];
+    const [activityCount, messageCount] = await prisma.$transaction([
+      prisma.crmActivity.count({ where: { ...currentScope, leadId: id, deletedAt: null, type: { in: contactTypes } } }),
+      prisma.communicationMessage.count({ where: { ...currentScope, leadId: id, deletedAt: null, status: { in: ["SENT", "DELIVERED", "READ"] } } })
+    ]);
+    if (activityCount === 0 && messageCount === 0) throw new ApiError(409, "Registre ao menos um contato antes de ativar este possivel cliente.");
   }
 
   public async activateLeadAsClient(id: string, ownerId: string) {

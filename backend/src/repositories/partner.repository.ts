@@ -4,7 +4,7 @@ import type { ListQuery } from "../utils/pagination.js";
 import { pagination } from "../utils/pagination.js";
 
 const partnerInclude = {
-  projectLinks: { include: { project: { include: { client: true, product: true } } } },
+  projectLinks: { include: { project: { include: { client: true, product: true } } }, orderBy: { createdAt: "desc" as const } },
   interactions: { orderBy: { occurredAt: "desc" }, take: 20 },
   users: { select: { id: true, name: true, email: true, role: true } },
   _count: { select: { projectLinks: true, interactions: true, users: true } }
@@ -54,5 +54,13 @@ export class PartnerRepository {
 
   public createInteraction(data: Prisma.PartnerInteractionCreateInput) {
     return prisma.partnerInteraction.create({ data });
+  }
+
+  public updateCommission(partnerId: string, projectId: string, data: Prisma.PartnerProjectUpdateInput) {
+    return prisma.partnerProject.update({
+      where: { partnerId_projectId: { partnerId, projectId } },
+      data,
+      include: { project: { include: { client: true, product: true } } }
+    });
   }
 }

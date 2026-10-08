@@ -269,6 +269,13 @@ enum CustomerRiskLevel {
   CRITICAL
 }
 
+enum PartnerCommissionStatus {
+  PENDING
+  APPROVED
+  PAID
+  CANCELED
+}
+
 enum SystemMonitorStatus {
   UNKNOWN
   ACTIVE
@@ -914,6 +921,10 @@ model PartnerProject {
   projectId  String
   partner    Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
   project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  commissionAmount Decimal? @db.Decimal(12, 2)
+  commissionStatus PartnerCommissionStatus @default(PENDING)
+  dueDate DateTime?
+  paidAt DateTime?
   createdAt  DateTime @default(now())
 
   @@id([partnerId, projectId])

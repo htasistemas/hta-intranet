@@ -35,6 +35,7 @@ export default function App() {
         <Route element={session ? <AppLayout /> : <Navigate to="/login" replace />}>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/crm-comercial" element={<CrmPage />} />
+          <Route path="/possiveis-clientes" element={<CrmPage />} />
           <Route path="/clientes" element={<ClientsPage />} />
           <Route path="/clientes-ativos" element={<ClientsPage />} />
           <Route path="/captacao" element={<ProspectingPage />} />
