@@ -29,6 +29,7 @@ import {
   LifeBuoy,
   MonitorCheck,
   UserCog,
+  UserPlus,
   X,
   type LucideIcon
 } from "lucide-react";
@@ -61,6 +62,7 @@ const navigation: NavigationGroup[] = [
     icon: ContactRound,
     items: [
       { label: "Clientes ativos", href: "/clientes-ativos", icon: ContactRound },
+      { label: "Possiveis clientes", href: "/possiveis-clientes", icon: UserPlus },
       { label: "Captacao", href: "/captacao", icon: CircleDot },
       { label: "Produtos", href: "/produtos", icon: Package },
       { label: "Parceiros", href: "/parceiros", icon: Network },

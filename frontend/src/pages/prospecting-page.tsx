@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { Edit3, Filter, History, LayoutGrid, List, Mail, Plus, Printer, Send, Search, Trash2, TrendingUp, Upload, UserCheck, X } from "lucide-react";
+import { Edit3, Filter, History, LayoutGrid, List, Mail, Plus, Printer, Send, Search, Trash2, TrendingUp, Upload, UserCheck, UserPlus, X } from "lucide-react";
 import { api } from "@/services/api";
 import type { PageResult } from "@/types";
 import type { CrmLead, CrmLeadCityStat, CrmLeadImportResult, CrmLeadScore, CrmLeadStats, CrmLeadStatus, CrmRegistrationStatus } from "@/types/crm";
@@ -227,7 +227,7 @@ export default function ProspectingPage() {
     onSuccess: () => {
       refreshLists();
       void queryClient.invalidateQueries({ queryKey: ["clients"] });
-      toast("Captacao movida para clientes ativos.");
+      toast("Captacao movida para possiveis clientes.");
     },
     onError: (error) => toast(error.message, "error")
   });
@@ -339,7 +339,7 @@ export default function ProspectingPage() {
                   <div className="mt-4 flex flex-wrap items-center gap-1 border-t border-slate-700/60 pt-3" onClick={(event) => event.stopPropagation()}>
                     <Button type="button" variant="ghost" size="icon" onClick={() => setLeadToHistory(lead)} aria-label="Ver histórico"><History size={16} /></Button>
                     <Button type="button" variant="ghost" size="icon" onClick={() => setLeadToEmail(lead)} disabled={!lead.email} aria-label={lead.email ? "Enviar e-mail" : "Captação sem e-mail"}><Mail size={16} /></Button>
-                    <Button type="button" variant="outline" size="sm" onClick={() => activateClient.mutate(lead.id)} disabled={activateClient.isPending} aria-label="Ativar como cliente"><UserCheck size={16} /> Ativar</Button>
+                    <Button type="button" variant="outline" size="sm" onClick={() => activateClient.mutate(lead.id)} disabled={activateClient.isPending} aria-label="Mover para possiveis clientes"><UserPlus size={16} /> Possivel cliente</Button>
                     <Button type="button" variant="ghost" size="icon" onClick={() => { setSelected(lead); setOpened(true); }} aria-label="Editar captacao"><Edit3 size={16} /></Button>
                     <Button type="button" variant="danger" size="icon" onClick={() => setLeadToDelete(lead)} disabled={remove.isPending} aria-label="Excluir captacao"><Trash2 size={16} /></Button>
                   </div>
@@ -377,7 +377,7 @@ export default function ProspectingPage() {
                     <div className="flex justify-end gap-1 pr-3">
                       <Button type="button" variant="ghost" size="icon" onClick={() => setLeadToHistory(lead)} aria-label="Ver histórico"><History size={16} /></Button>
                       <Button type="button" variant="ghost" size="icon" onClick={() => setLeadToEmail(lead)} disabled={!lead.email} aria-label={lead.email ? "Enviar e-mail" : "Captação sem e-mail"}><Mail size={16} /></Button>
-                      <Button type="button" variant="outline" size="sm" onClick={() => activateClient.mutate(lead.id)} disabled={activateClient.isPending} aria-label="Ativar como cliente"><UserCheck size={16} /> Ativar</Button>
+                      <Button type="button" variant="outline" size="sm" onClick={() => activateClient.mutate(lead.id)} disabled={activateClient.isPending} aria-label="Mover para possiveis clientes"><UserPlus size={16} /> Possivel cliente</Button>
                       <Button type="button" variant="ghost" size="icon" onClick={() => { setSelected(lead); setOpened(true); }} aria-label="Editar captacao"><Edit3 size={16} /></Button>
                       <Button type="button" variant="danger" size="icon" onClick={() => setLeadToDelete(lead)} disabled={remove.isPending} aria-label="Excluir captacao"><Trash2 size={16} /></Button>
                     </div>

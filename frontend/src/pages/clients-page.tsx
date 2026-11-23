@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, Edit3, LayoutGrid, List, Plus, Search, Trash2, Upload, UserPlus } from "lucide-react";
+import { Download, Edit3, LayoutGrid, List, Plus, Search, Trash2, Upload, UserCheck, UserPlus } from "lucide-react";
 import { api } from "@/services/api";
 import type { Client, ClientImportResult, PageResult } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,7 @@ interface LinkedItem {
 const statusLabels: Record<Client["status"], string> = {
   ACTIVE: "Ativo",
   INACTIVE: "Inativo",
-  PROSPECT: "Prospect"
+  PROSPECT: "Possivel cliente"
 };
 
 const statusClasses: Record<Client["status"], string> = {
@@ -84,7 +84,11 @@ function LinkedItemsCell({ client }: { client: Client }) {
   );
 }
 
-export default function ClientsPage() {
+interface ClientsPageProps {
+  status?: Client["status"];
+}
+
+export default function ClientsPage({ status = "ACTIVE" }: ClientsPageProps) {
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<"cards" | "list">("list");
   const [selected, setSelected] = useState<Client | undefined>();
@@ -93,7 +97,8 @@ export default function ClientsPage() {
   const [importOpened, setImportOpened] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { data, isLoading } = useQuery({ queryKey: ["clients", "active", search], queryFn: () => api.get<PageResult<Client>>(`/clients?pageSize=30&status=ACTIVE&search=${encodeURIComponent(search)}`) });
+  const isProspect = status === "PROSPECT";
+  const { data, isLoading } = useQuery({ queryKey: ["clients", status, search], queryFn: () => api.get<PageResult<Client>>(`/clients?pageSize=30&status=${status}&search=${encodeURIComponent(search)}`) });
   const save = useMutation({
     mutationFn: (input: Record<string, unknown>) => selected ? api.put<Client>(`/clients/${selected.id}`, input) : api.post<Client>("/clients", input),
     onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["clients"] }); void queryClient.invalidateQueries({ queryKey: ["message-clients"] }); setOpened(false); toast("Cliente salvo com sucesso."); },
@@ -116,6 +121,15 @@ export default function ClientsPage() {
     },
     onError: (error) => toast(error.message, "error")
   });
+  const activateClient = useMutation({
+    mutationFn: (clientId: string) => api.post<Client>(`/clients/${clientId}/activate`, {}),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["clients"] });
+      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      toast("Cliente ativado após fechamento do contrato.");
+    },
+    onError: (error) => toast(error.message, "error")
+  });
   const exportReport = async (type: "csv" | "pdf") => {
     try { await api.download(`/reports/clients.${type}`, `clientes.${type}`); toast("Relatorio exportado."); }
     catch (error) { toast(error instanceof Error ? error.message : "Falha na exportacao.", "error"); }
@@ -133,7 +147,7 @@ export default function ClientsPage() {
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row">
-        <label className="relative flex-1"><Search className="absolute left-3 top-3 text-slate-500" size={18} /><Input className="pl-10" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar cliente ativo, documento ou email" /></label>
+        <label className="relative flex-1"><Search className="absolute left-3 top-3 text-slate-500" size={18} /><Input className="pl-10" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={`Buscar ${isProspect ? "possivel cliente" : "cliente ativo"}, documento ou email`} /></label>
         <div className="grid grid-cols-2 rounded-xl border border-slate-700 bg-sidebar p-1">
           <button type="button" className={cn("inline-flex h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm text-slate-400 transition", viewMode === "cards" && "bg-accent/10 text-accent")} onClick={() => setViewMode("cards")} aria-pressed={viewMode === "cards"}>
             <LayoutGrid size={17} /> Cards
@@ -165,7 +179,7 @@ export default function ClientsPage() {
                   <p>{currency(Number(client.expectedValue ?? 0))}</p>
                 </div>
                 <div className="mt-4 flex justify-end gap-1" onClick={(event) => event.stopPropagation()}>
-                  <Button variant="outline" size="sm" onClick={() => moveToProspecting.mutate(client.id)} disabled={moveToProspecting.isPending} aria-label="Voltar para captacao"><UserPlus size={17} /> Captacao</Button>
+                  {isProspect ? <Button variant="outline" size="sm" onClick={() => activateClient.mutate(client.id)} disabled={activateClient.isPending} aria-label="Ativar cliente"><UserCheck size={17} /> Contrato fechado</Button> : <Button variant="outline" size="sm" onClick={() => moveToProspecting.mutate(client.id)} disabled={moveToProspecting.isPending} aria-label="Voltar para captacao"><UserPlus size={17} /> Captacao</Button>}
                   <Button variant="ghost" size="icon" onClick={() => openClient(client)} aria-label="Editar cliente"><Edit3 size={17} /></Button>
                   <Button variant="danger" size="icon" onClick={() => setClientToDelete(client)} disabled={remove.isPending} aria-label="Excluir cliente"><Trash2 size={17} /></Button>
                 </div>
@@ -187,7 +201,7 @@ export default function ClientsPage() {
                   <td>{currency(Number(client.expectedValue ?? 0))}</td>
                   <td>
                     <div className="flex justify-end gap-1 pr-3">
-                      <Button variant="outline" size="sm" onClick={() => moveToProspecting.mutate(client.id)} disabled={moveToProspecting.isPending} aria-label="Voltar para captacao"><UserPlus size={17} /> Captacao</Button>
+                      {isProspect ? <Button variant="outline" size="sm" onClick={() => activateClient.mutate(client.id)} disabled={activateClient.isPending} aria-label="Ativar cliente"><UserCheck size={17} /> Contrato fechado</Button> : <Button variant="outline" size="sm" onClick={() => moveToProspecting.mutate(client.id)} disabled={moveToProspecting.isPending} aria-label="Voltar para captacao"><UserPlus size={17} /> Captacao</Button>}
                       <Button variant="ghost" size="icon" onClick={() => openClient(client)} aria-label="Editar cliente"><Edit3 size={17} /></Button>
                       <Button variant="danger" size="icon" onClick={() => setClientToDelete(client)} disabled={remove.isPending} aria-label="Excluir cliente"><Trash2 size={17} /></Button>
                     </div>

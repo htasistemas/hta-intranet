@@ -38,6 +38,7 @@ export default function App() {
           <Route path="/possiveis-clientes" element={<CrmPage />} />
           <Route path="/clientes" element={<ClientsPage />} />
           <Route path="/clientes-ativos" element={<ClientsPage />} />
+          <Route path="/possiveis-clientes" element={<ClientsPage status="PROSPECT" />} />
           <Route path="/captacao" element={<ProspectingPage />} />
           <Route path="/portal-cliente" element={<CustomerPortalPage />} />
           <Route path="/produtos" element={<ProductsPage />} />

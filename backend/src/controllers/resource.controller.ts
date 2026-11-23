@@ -43,6 +43,9 @@ export class ClientController {
   public moveToProspecting = async (request: Request, response: Response): Promise<void> => {
     response.json(await this.service.moveToProspecting(resourceId(request), userId(request)));
   };
+  public activate = async (request: Request, response: Response): Promise<void> => {
+    response.json(await this.service.activate(resourceId(request), userId(request)));
+  };
 }
 
 export class ScheduleController {

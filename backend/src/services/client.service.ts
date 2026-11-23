@@ -199,4 +199,19 @@ export class ClientService {
       return lead;
     });
   }
+
+  public async activate(id: string, userId: string) {
+    const client = await this.get(id, userId);
+    if (client.status === "ACTIVE") return client;
+    const updatedClient = await this.repository.update(id, { status: "ACTIVE" });
+    await this.auditRepository.log({
+      userId,
+      clientId: id,
+      entity: "Client",
+      entityId: id,
+      action: "UPDATED",
+      changes: { status: "ACTIVE", source: "contractClosed", previousStatus: client.status }
+    });
+    return updatedClient;
+  }
 }

@@ -110,6 +110,7 @@ apiRouter.post("/clients/import", validateBody(clientImportRequestSchema), async
 apiRouter.post("/clients", validateBody(clientSchema), asyncHandler(clients.create));
 apiRouter.put("/clients/:id", validateBody(clientSchema), asyncHandler(clients.update));
 apiRouter.post("/clients/:id/move-to-prospecting", asyncHandler(clients.moveToProspecting));
+apiRouter.post("/clients/:id/activate", asyncHandler(clients.activate));
 apiRouter.delete("/clients/:id", asyncHandler(clients.delete));
 apiRouter.get("/products", asyncHandler(products.list));
 apiRouter.get("/products/insights", asyncHandler(products.insights));

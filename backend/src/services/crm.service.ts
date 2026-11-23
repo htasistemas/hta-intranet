@@ -721,7 +721,7 @@ export class CrmService {
       city: lead.city,
       state: lead.state,
       observations: lead.observations,
-      status: "ACTIVE" as const,
+      status: "PROSPECT" as const,
       source: lead.source,
       segment: lead.segment,
       responsible: lead.responsible,
@@ -740,10 +740,10 @@ export class CrmService {
       await tx.crmLead.update({
         where: { id },
         data: {
-          status: "WON",
-          stage: "SALE_COMPLETED",
+          status: "QUALIFIED",
+          stage: "APPROVAL",
           convertedAt: new Date(),
-          wonAt: lead.wonAt ?? new Date()
+          wonAt: lead.wonAt
         }
       });
       await tx.auditLog.create({
@@ -763,7 +763,7 @@ export class CrmService {
           leadId: id,
           type: "STATUS_CHANGE" satisfies CrmActivityType,
           status: "COMPLETED",
-          title: "Captacao convertida em cliente ativo",
+          title: "Captacao movida para possiveis clientes",
           responsible: lead.responsible,
           completedAt: new Date(),
           metadata: { clientId: client.id }
